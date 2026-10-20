@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="pt"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulação — Sistema de Refrigeração de Transformadores</title>
+<style>
+:root{--bg:#0b0f16;--pn:#121923;--bd:#243044;--tx:#e8edf5;--dm:#8f9db3;--ac:#4da3ff;--ok:#38d68b;--wn:#ffb020;--or:#ff7a2f;--cr:#ff4d4f;--tr:#1b2433;--gl:rgba(15,21,32,.92);--hud:rgba(9,14,23,.76)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#eef1f6;--pn:#fff;--bd:#d5dbe5;--tx:#18202c;--dm:#5b6678;--tr:#eef2f7;--gl:rgba(255,255,255,.94)}}
+:root[data-theme="light"]{--bg:#eef1f6;--pn:#fff;--bd:#d5dbe5;--tx:#18202c;--dm:#5b6678;--tr:#eef2f7;--gl:rgba(255,255,255,.94)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:14px/1.4 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+#app{position:fixed;inset:0}
+#vp{position:absolute;inset:0;background:#0a0e15}
+#cv{display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline:none}#cv:active{cursor:grabbing}
+#lbl{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.l{position:absolute;left:0;top:0;background:rgba(8,12,20,.78);color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;white-space:nowrap;border:1px solid rgba(255,255,255,.2);transition:opacity .25s;will-change:transform,opacity}
+
+button{font:inherit;cursor:pointer;color:var(--tx);background:var(--tr);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;min-height:40px;transition:background .15s,border-color .15s,transform .1s}
+button:hover{border-color:var(--ac)}button:active{transform:scale(.97)}
+button.on{background:var(--ac);border-color:var(--ac);color:#04121f;font-weight:600}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* ---- HUD sempre visível: método + temperatura ---- */
+#hud{position:absolute;left:0;right:0;top:0;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 0;pointer-events:none;z-index:3}
+#top{min-width:0;color:#fff;text-shadow:0 1px 4px #000;padding:2px 0 0 0}
+#top b{display:block;font-size:16px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#top span{display:block;font-size:12px;opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tcard{flex:none;width:260px;color:#fff;background:var(--hud);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:9px 12px 9px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#tcard .k{color:#aeb9cb;margin:0}
+.t1{display:flex;align-items:center;gap:8px;margin-top:1px}
+#tv{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;color:#07101a;background:var(--ok);vertical-align:middle;transition:background .3s}
+#bar{position:relative;height:8px;margin:7px 0 0;border-radius:5px;background:rgba(255,255,255,.14);overflow:hidden}
+#fill{position:absolute;inset:0;background:linear-gradient(90deg,var(--ok),var(--wn),var(--cr));clip-path:inset(0 70% 0 0);transition:clip-path .35s linear}
+#bar b{position:absolute;top:0;bottom:0;width:2px;background:#fff;opacity:.75}
+.tk{position:relative;height:13px;margin-top:3px;font-size:10px;color:#9fb0c6}.tk span{position:absolute;transform:translateX(-50%)}
+#cool{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-top:7px;padding-top:6px;border-top:1px solid rgba(255,255,255,.14)}#cool .k2{font-size:9.5px;color:#9fb0c6;line-height:1.2}#cool b{display:block;font-size:15px;font-variant-numeric:tabular-nums}#cool .w2{grid-column:1/3}#cool .w2 b{font-size:20px;display:inline}#etg{margin-left:6px;font-size:10px;color:var(--ok)}
+#adv{margin-top:6px;font-size:10.5px;line-height:1.3;padding:5px 7px;border-radius:8px;background:rgba(255,255,255,.08);pointer-events:auto}#adv button{margin-top:4px;font-size:10.5px;padding:3px 9px;border-radius:99px;background:var(--wn);border-color:var(--wn);color:#1a1000;font-weight:700}#lad .lr{display:grid;grid-template-columns:1.3fr .8fr 1fr;gap:6px;align-items:center;padding:6px 8px;margin-bottom:4px;border:1px solid var(--bd);border-radius:9px;font-size:12px;background:var(--pn)}#lad .lr.cu{border-color:var(--ac)}#lad .lr.rc{box-shadow:0 0 0 2px var(--ok)}#lad .st{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:99px;color:#07101a;text-align:center}
+#gb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;pointer-events:auto;font-size:10.5px;color:#cfd8e6}#gb button{font-size:11px;padding:4px 9px;border-radius:99px;font-weight:700}#pk{background:var(--wn);border-color:var(--wn);color:#2b1b00}#pk.on{background:var(--cr);border-color:var(--cr);color:#fff}#ld2{background:var(--tr);border-color:var(--ac);color:#fff}#au.on,#sb.on{background:var(--ok);border-color:var(--ok);color:#042014}#ld{background:var(--ac);border-color:var(--ac);color:#04101a}#adv.hot{background:rgba(255,77,79,.28);animation:pl 1s infinite}@keyframes pl{50%{background:rgba(255,77,79,.1)}}
+#bar s{position:absolute;top:0;bottom:0;left:44.4%;width:16.7%;background:rgba(255,255,255,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}#bst{margin-top:6px;font-size:10.5px;color:#cfd8e6}#specp{position:absolute;z-index:7;left:96px;top:150px;width:min(360px,calc(100% - 24px));max-height:calc(100% - 240px);overflow:auto;display:none;background:var(--gl);border:1px solid var(--bd);border-radius:14px;padding:10px 14px;backdrop-filter:blur(10px)}#specp.open{display:block}@media(max-width:820px){#specp{left:8px;right:8px;width:auto;max-height:calc(100% - 330px)}}#spec table td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+#lamps{display:flex;gap:6px;margin-top:6px}
+#lamps i{font-style:normal;font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.1);color:#b9c4d6;transition:background .2s,color .2s}
+#lamps i.on{background:var(--ok);color:#042014;font-weight:700}
+#lamps i.al{background:var(--cr);color:#fff;font-weight:700}
+
+/* ---- avisos sobre o 3D ---- */
+#msgs{position:absolute;left:50%;transform:translateX(-50%);top:calc(146px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:center;gap:8px;width:min(92%,540px);pointer-events:none;z-index:4}
+#bn,#sn{display:none;padding:8px 14px;border-radius:10px;font-weight:600;font-size:13px;text-align:center;max-width:100%}
+#sn{font-weight:500;font-size:12.5px;background:rgba(20,70,120,.92);color:#fff}
+
+/* ---- barra de painéis (esquerda no ecrã grande, em baixo no telemóvel) ---- */
+#tabs{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:4px;padding:6px;background:var(--hud);border:1px solid rgba(255,255,255,.14);border-radius:18px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;width:68px;min-height:54px;padding:7px 2px 6px;border:0;background:transparent;color:#cfd8e6;border-radius:13px;font-size:11px;line-height:1.2}
+#tabs button .ic{font-size:20px;line-height:1.1}
+#tabs button:hover{background:rgba(255,255,255,.1)}
+#tabs button.on{background:var(--ac);color:#04121f;font-weight:700}
+
+/* ---- controlo de tempo ---- */
+#tr{position:absolute;z-index:6;left:calc(50% + 46px);bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:5px;background:var(--hud);border:1px solid rgba(255,255,255,.14);border-radius:999px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:left .3s cubic-bezier(.2,.8,.2,1)}
+#app.po #tr{left:calc(50% - 170px)}
+#tr>button{background:transparent;border:0;color:#fff;border-radius:999px;padding:7px 14px;min-height:38px}
+#tr>button:hover{background:rgba(255,255,255,.12)}
+#sp{display:flex;background:rgba(255,255,255,.1);border-radius:999px;padding:2px}
+#sp button{background:transparent;border:0;color:#cfd8e6;border-radius:999px;padding:6px 12px;min-height:34px}
+#sp button.on{background:var(--ac);color:#04121f}
+
+/* ---- painel (gaveta) ---- */
+#sheet{position:absolute;z-index:5;right:12px;top:146px;width:min(420px,calc(100% - 24px));max-height:calc(100% - 160px);display:flex;flex-direction:column;background:var(--gl);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--bd);border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,.35);opacity:0;visibility:hidden;pointer-events:none;transform:translateX(28px);transition:opacity .22s,transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s linear .32s}
+#sheet.open{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition-delay:0s}
+#sh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 12px 8px 16px}
+#sh-t{font-size:16px;font-weight:700}
+#sx{width:36px;height:36px;min-height:0;padding:0;border-radius:99px;font-size:15px;line-height:1}
+#sbody{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 16px 16px}
+.pnl{display:none;flex-direction:column;gap:14px}.pnl.show{display:flex}
+
+/* ---- componentes dos painéis ---- */
+.k{font-size:12px;color:var(--dm);margin-bottom:5px}
+.c{background:var(--tr);border:1px solid var(--bd);border-radius:12px;padding:10px 12px}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.r{background:var(--pn);border:1px solid var(--bd);border-radius:10px;padding:7px 10px}.r .k{margin:0 0 2px;font-size:11.5px}.r .v{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.on1{color:var(--ok)}.of{color:var(--dm)}.al{color:var(--cr)}
+.vg,.mg,.sc{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.vg button,.mg button,.sc button{text-align:left;font-size:13px;padding:8px 10px}
+.mg button:last-child{grid-column:span 2}
+.row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.row button{flex:1}
+.wide{width:100%;margin-top:6px}
+.fn{font-size:11.5px;color:var(--dm)}
+.hint{line-height:1.5}
+input[type=range]{width:100%;height:30px;accent-color:var(--ac)}
+canvas#ch{width:100%;height:170px;display:block;margin-top:8px}
+#log{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;max-height:240px;overflow:auto;color:var(--dm);margin-top:6px}#log div b{color:var(--tx)}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:11px;color:var(--dm);font-weight:600}tr.hl td{background:rgba(77,163,255,.2);font-weight:600}
+.bb{display:grid;grid-template-columns:100px 1fr 34px;gap:6px;align-items:center;font-size:11.5px;margin:4px 0}.bb i{display:block;height:9px;border-radius:5px;background:var(--bd);position:relative;overflow:hidden}.bb u{position:absolute;left:0;top:0;bottom:0;border-radius:5px;transition:width .25s linear}.bb span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.eq{background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:6px 9px;margin-top:6px;font:13px/1.5 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;overflow-x:auto}
+.eq .n{font-weight:600;color:var(--tx);font-size:12px}.eq .f{color:var(--ac);font-weight:600}.eq b{color:var(--tx)}
+.eq math[display=block]{margin:.45em 0;text-align:left}.eq .w{color:var(--dm);font-size:11.5px;margin-top:2px}math .rs{color:var(--ok);font-weight:700}
+math{font-family:"Latin Modern Math","STIX Two Math","Cambria Math","Noto Sans Math",serif;font-size:1.12em;text-transform:none;letter-spacing:0}
+details.gd{border:1px solid var(--bd);border-radius:10px;padding:4px 10px;background:var(--pn)}
+details.gd summary{cursor:pointer;font-weight:600;font-size:13px;min-height:34px;display:flex;align-items:center}
+details.gd[open] summary{margin-bottom:4px}
+details.gd p{margin:6px 0 2px;font-size:12px;color:var(--dm)}
+#dm.on{background:var(--wn);border-color:var(--wn);color:#2b1b00}
+
+/* ---- ecrã inicial ---- */
+#start{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(6,10,16,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);text-align:center;color:#fff;padding:20px;overflow:auto}
+#start .bx{max-width:560px}#start h1{font-size:24px;margin:0 0 8px}#start p{margin:6px 0;color:#b9c4d6;font-size:13px}
+#go{margin-top:18px;font-size:17px;padding:13px 30px;background:var(--ok);border-color:var(--ok);color:#042014;font-weight:700;border-radius:999px;box-shadow:0 0 0 6px rgba(56,214,139,.18)}
+
+/* ---- telemóvel / ecrã baixo ---- */
+@media(max-width:820px),(max-height:560px){
+ #tcard{width:176px;padding:7px 10px 8px}#tv{font-size:24px}
+ #top b{font-size:15px}
+ #tabs{left:0;right:0;top:auto;bottom:0;transform:none;flex-direction:row;overflow-x:auto;gap:2px;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0;border-bottom:0;scrollbar-width:none}
+ #tabs::-webkit-scrollbar{display:none}
+ #tabs button{flex:1 0 60px;width:auto}
+ #tr{left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+ #app.po #tr{left:50%}
+ .hm{display:none}
+ #sheet{left:8px;right:8px;top:auto;width:auto;bottom:calc(128px + env(safe-area-inset-bottom,0px));max-height:min(50vh,calc(100% - 300px));transform:translateY(28px)}
+ #msgs{top:calc(138px + env(safe-area-inset-top,0px))}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<div id="app">
+<div id="vp"><canvas id="cv"></canvas><div id="lbl"></div></div>
+
+<header id="hud">
+ <div id="top"><b id="mbn"></b><span id="mbs"></span></div>
+ <div id="tcard">
+  <div class="k">Temperatura do transformador</div>
+  <div class="t1"><span id="tv">45,0 °C</span><span id="pill" class="pill">NORMAL</span></div>
+  <div id="bar"><i id="fill"></i><b style="left:44.4%"></b><b style="left:61.1%"></b><b style="left:72.2%"></b><b style="left:83.3%"></b></div>
+  <div class="tk"><span style="left:44.4%">60</span><span style="left:61.1%">75</span><span style="left:72.2%">85</span><span style="left:83.3%">95</span></div>
+  <div id="lamps"><i id="lA1">—</i><i id="lA2">—</i><i id="lAL">Alarme</i></div>
+  <div id="bst"></div>
+  <div id="adv"></div>
+  <div id="gb"><span id="dem"></span><button id="ld2">－ Carga</button><button id="ld">＋ Carga</button><button id="sb">📋 Especificações</button><button id="au" class="on" title="Mudar automaticamente para o método que atende quando T &gt; limite normal">Auto</button><button id="gr" title="Reiniciar guia">↺</button></div>
+  <div id="cool"><div class="w2"><span class="k2">Rendimento η</span><br><b id="eta">–</b><span id="etg"></span></div><div><span class="k2">Redução de T (regime)</span><b id="cdt">–</b></div><div><span class="k2">Perdas removidas pelos actuadores</span><b id="cqp">–</b></div></div>
+ </div>
+</header>
+<div id="msgs"><div id="bn"></div><div id="sn"></div></div>
+
+<nav id="tabs" aria-label="Painéis">
+ <button data-p="view"><span class="ic">🎥</span>Vistas</button>
+ <button data-p="method"><span class="ic">❄️</span>Método</button>
+ <button data-p="state"><span class="ic">📊</span>Estado</button>
+ <button data-p="ctrl"><span class="ic">🎛️</span>Controlo</button>
+ <button data-p="elec"><span class="ic">⚡</span>Eléctrico</button>
+ <button data-p="bh"><span class="ic">🛢️</span>Buchholz</button>
+ <button data-p="math"><span class="ic">∑</span>Fórmulas</button>
+</nav>
+
+<div id="tr">
+ <button id="pa">⏸ Pausar</button>
+ <button id="rs" aria-label="Reiniciar" title="Reiniciar">↺<span class="hm"> Reiniciar</span></button>
+ <div id="sp"><button data-s="1" class="on">×1</button><button data-s="3">×3</button><button data-s="6">×6</button></div>
+</div>
+
+<section id="sheet" aria-hidden="true">
+ <div id="sh"><b id="sh-t"></b><button id="sx" aria-label="Fechar painel">✕</button></div>
+ <div id="sbody">
+
+  <div class="pnl" id="p-view">
+   <div><div class="k">Para onde olhar</div><div class="vg">
+    <button data-v="0">Vista geral</button><button data-v="5">Transformador</button>
+    <button data-v="1">Refrigeração</button><button data-v="3">Relé de Buchholz</button>
+    <button data-v="4">Disjuntor</button><button data-v="2">Ecrã e alarme</button></div></div>
+   <div><div class="k">Opções</div><div class="vg">
+    <button id="bl" class="on">Rótulos</button><button id="iv">Ver o interior</button>
+    <button id="orb">Órbita automática</button><button id="af" class="on">Câmara segue o painel</button>
+    <button id="fs">Ecrã inteiro</button></div></div>
+   <div class="fn hint">Arrastar: rodar · Dois dedos ou botão direito: mover · Pinça ou roda do rato: zoom · Toque duplo: repor a vista · Teclado: setas, + e −, espaço para pausar.</div>
+  </div>
+
+  <div class="pnl" id="p-method">
+   <div class="mg" id="mg"></div>
+   
+   <div><div class="k">Escada de eficiência (carga prevista): capacidade crescente</div><div id="lad"></div></div>
+   <div class="c"><div><b id="mn"></b> <span class="pill" id="mc" style="background:var(--ac)"></span></div><div class="fn" id="md" style="margin-top:4px"></div></div>
+   <div><div class="k">Estratégia de controlo (3.6 · Tabela 4.2)</div>
+    <table><thead><tr><th>Estado térmico</th><th>Acção do sistema</th></tr></thead><tbody id="mt"></tbody></table></div>
+   <details class="gd"><summary>Comparar os 5 métodos</summary><div class="k" id="cmk"></div>
+    <table><thead><tr><th>Método</th><th>T final</th><th>Actuação</th></tr></thead><tbody id="cmp"></tbody></table></details>
+  </div>
+
+  <div class="pnl" id="p-state">
+   <div class="g">
+    <div class="r"><div class="k" id="f1k">Actuador 1</div><div class="v of" id="f1">Desligado</div></div>
+    <div class="r"><div class="k" id="f2k">Actuador 2</div><div class="v of" id="f2">Desligado</div></div>
+    <div class="r"><div class="k">Alarme (A)</div><div class="v of" id="al">Desligado</div></div>
+    <div class="r"><div class="k">Tempo de simulação</div><div class="v" id="tt">00:00</div></div>
+    <div class="r"><div class="k">Carga L</div><div class="v" id="lv">50 %</div></div>
+    <div class="r"><div class="k">P<sub>perdas</sub> / Q<sub>ref</sub></div><div class="v" id="pq">– / –</div></div>
+    <div class="r"><div class="k">Ponto quente θ<sub>h</sub></div><div class="v" id="hs">–</div></div>
+    <div class="r"><div class="k">Envelhecimento V</div><div class="v" id="ag">–</div></div>
+   </div>
+   <details class="gd" open><summary>Gráfico da temperatura</summary><canvas id="ch"></canvas></details>
+   <details class="gd"><summary>Balanço energético (3.7)</summary>
+    <div style="text-align:center;font-size:16px;margin:4px 0"><math><msub><mi>C</mi><mi mathvariant="normal">th</mi></msub><mo>⋅</mo><mfrac><mrow><mi>d</mi><mi>T</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><msub><mi>P</mi><mi mathvariant="normal">perdas</mi></msub><mo>−</mo><msub><mi>Q</mi><mi mathvariant="normal">ref</mi></msub></math></div>
+    <div id="bal"></div><div class="fn" id="bv" style="margin:4px 0 6px"></div></details>
+   <details class="gd"><summary>Registo de eventos</summary><div id="log"></div></details>
+  </div>
+
+  <div class="pnl" id="p-ctrl">
+   <div><div class="k">Cenários de teste (3.11 · Tabela 4.1)</div><div class="sc" id="sc"></div></div>
+   <div class="c"><div class="k">Carga manual L(t): <b id="ls" style="color:var(--tx)">50 %</b></div><input id="sl" type="range" min="0" max="100" value="50"></div>
+   <div class="c"><div class="k">Temperatura ambiente T<sub>amb</sub>: <b id="tas" style="color:var(--tx)">25 °C</b></div><input id="ta" type="range" min="20" max="45" value="25"></div>
+   <div class="row" style="margin-top:0"><button id="dm">🎬 Demo automática</button><button id="snd">🔔 Som: off</button></div>
+  </div>
+
+  <div class="pnl" id="p-elec">
+   <div class="c"><div class="k">Disjuntor de AT (33 kV) · energização</div>
+    <div class="g"><div class="r"><div class="k">Posição</div><div class="v" id="cbs">–</div></div><div class="r"><div class="k">Transformador</div><div class="v" id="cbv" style="font-size:13px">–</div></div></div>
+    <div class="row"><button id="c1">🔌 Fechar (energizar)</button><button id="c2">⏏ Abrir</button></div>
+    <button id="c3" class="wide">▶ Cenário de energização</button>
+    <div class="fn" id="cbd" style="margin-top:8px"></div></div>
+   <div class="c"><div class="k">Grandezas eléctricas (1000 kVA · 33/0,4 kV · cos φ = 0,9)</div>
+    <div class="g" id="el"></div>
+    <canvas id="osc" width="420" height="84" style="width:100%;margin-top:6px;border-radius:6px;background:#0b1118"></canvas>
+    <div class="fn" style="margin-top:6px">Perdas reais obtidas do mesmo modelo: 1 unidade térmica ≈ 0,22 kW. Rendimento η = P₂/(P₂+P<sub>Fe</sub>+P<sub>Cu</sub>).</div></div>
+  </div>
+
+  <div class="pnl" id="p-bh">
+   <div class="g"><div class="r"><div class="k">Estado</div><div class="v" id="bhs">Normal</div></div><div class="r"><div class="k">Gás na câmara</div><div class="v" id="bhg">0 %</div></div></div>
+   <div class="row" style="margin-top:0"><button id="b1">⚡ Falha incipiente</button><button id="b2">💥 Falha grave</button><button id="b3">↺ Rearmar</button></div>
+   <div class="fn" id="bhd"></div>
+  </div>
+
+  <div class="pnl" id="p-math">
+   <div id="mpn"><div id="gd"></div><div id="mm"></div></div>
+   <div class="fn" id="pf"></div>
+  </div>
+
+ </div>
+</section>
+
+<div id="specp"><b>Especificações do transformador</b><div id="spec"></div></div>
+<div id="start"><div class="bx"><h1>Refrigeração automática de transformador</h1><p>Os cinco métodos de refrigeração do Capítulo II (2.11): natural, forçada a ar, óleo-ar, óleo-água e circulação forçada do líquido, com controlo automático por níveis: 1.º nível a 60 °C, 2.º nível a 75 °C, limite normal 85 °C e alarme a 95 °C.</p><p>Método seleccionado no Capítulo III (3.2): refrigeração forçada a ar. Modelo (3.7): <math><msub><mi>C</mi><mi mathvariant="normal">th</mi></msub><mo>⋅</mo><mfrac><mrow><mi>d</mi><mi>T</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><msub><mi>P</mi><mi mathvariant="normal">perdas</mi></msub><mo>−</mo><msub><mi>Q</mi><mi mathvariant="normal">ref</mi></msub></math></p><button id="go">▶ Iniciar simulação</button></div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=i=>document.getElementById(i),fm=(x,d=1)=>x.toFixed(d).replace(".",",");
+const P={T1:60,T2:75,TN:85,T3:95,Ta:25,C:40,h:.4,P0:8,kL:45,H:2,g:15,y:1.3};
+/* Métodos do Cap. II, 2.11. q = calor removido por cada actuador (unidades do modelo) */
+const MT=[
+{n:"Refrigeração natural",sn:"Natural",sec:"2.11.1",k:"ONAN",na:0,q:[0,0],act:["—","—"],sh:["",""],
+ d:"Sem bombas nem ventiladores: o óleo circula por termossifão e o calor passa aos radiadores por convecção natural do ar. Só o alarme está activo.",
+ rows:["Convecção natural","Sem actuação adicional (método sem refrigeração forçada)","Sem actuação adicional: a temperatura continua a subir","Alarme A: reduzir a carga ou intervir"]},
+{n:"Refrigeração forçada a ar",sn:"Ar forçado",sec:"2.11.2",k:"ONAF",na:2,q:[3,5],act:["Ventilador 1","Ventilador 2"],sh:["V1","V2"],
+ d:"Ventiladores aumentam o caudal de ar sobre os radiadores. É o método seleccionado no Capítulo III (3.2) e o dos cenários da Tabela 4.1.",
+ rows:["Ventiladores desligados (convecção natural)","Ventilador 1 ligado (1.º nível)","Ventiladores 1 e 2 ligados (2.º nível)","Ventiladores 1 e 2 + alarme"]},
+{n:"Refrigeração óleo-ar",sn:"Óleo-ar",sec:"2.11.3",k:"OFAF",na:2,q:[7,10],act:["Bomba de óleo","Ventiladores"],sh:["Bomba","Vent."],
+ d:"O óleo transporta o calor aos radiadores, onde passa ao ar. Circulação forçada de óleo (1.º nível) e de ar (2.º nível).",
+ rows:["Circulação natural de óleo e ar","Bomba de óleo ligada (óleo forçado)","Bomba de óleo + ventiladores (óleo e ar forçados)","Bomba + ventiladores + alarme"]},
+{n:"Refrigeração óleo-água",sn:"Óleo-água",sec:"2.11.4",k:"OFWF",na:2,q:[10,15],act:["Bomba de óleo","Bomba de água"],sh:["B. óleo","B. água"],
+ d:"O calor do óleo passa a um circuito de água através de um permutador. Maior capacidade, mas exige equipamento adicional (2.10.3).",
+ rows:["Circulação natural do óleo","Bomba de óleo ligada ao permutador","Bomba de óleo + bomba de água do permutador","Ambas as bombas + alarme"]},
+{n:"Circulação forçada do líquido",sn:"Circulação forçada do líquido",sec:"2.11.5",k:"bombas (IEC 60076-22-5)",na:2,q:[14,20],act:["Bomba 1","Bomba 2"],sh:["B1","B2"],
+ d:"Quando a circulação natural não basta, bombas forçam o líquido isolante através dos enrolamentos e radiadores.",
+ rows:["Circulação natural do líquido","Bomba 1 ligada (1.º nível)","Bombas 1 e 2 ligadas (2.º nível)","Bombas 1 e 2 + alarme"]}];
+const S={auto:1,op:0,inr:0,inrA:8,sc:null,gas:0,fault:0,b1:0,sg:0,trip:0,int:0,age:0,T:45,L:.5,Lt:.5,F:[0,0],A:0,run:false,pause:false,sp:1,t:0,hist:[],hn:0,snd:false,m:1};
+const SC=[["1 · Funcionamento normal",null,.45,.45],["2 · Aumento da carga",null,.45,.6],["3 · Primeiro nível",60,.85,.85],["4 · Segundo nível",75,1,1],["5 · Condição crítica",95,1,1],["6 · Recuperação térmica",100,1,.45],["7 · Energização do transformador",30,0,0],["8 · Guiado (passo a passo)",25,0,0]];
+let cur=0,demo=null;
+const pl=L=>P.P0+P.kL*L*L;
+function ctl(st,T,M){
+ if(M.na>0){if(T>=P.T1)st.F[0]=1;else if(T<P.T1-P.H)st.F[0]=0}else st.F[0]=0;
+ if(M.na>1){if(T>=P.T2)st.F[1]=1;else if(T<P.T2-P.H)st.F[1]=0}else st.F[1]=0;
+ if(T>=P.T3)st.A=1;else if(T<P.T3-P.H)st.A=0}
+function sim(m,T0,L,H){const M=MT[m],st={F:[0,0],A:0};let T=T0,mx=T0;ctl(st,T,M);
+ for(let t=0;t<H;t++){ctl(st,T,M);const Q=P.h*(T-P.Ta)+st.F[0]*M.q[0]+st.F[1]*M.q[1];T+=(pl(L)-Q)/P.C;if(T>mx)mx=T}
+ return{T,mx,F:st.F.slice(),A:st.A}}
+const fmt=t=>String(Math.floor(t/60)).padStart(2,"0")+":"+String(Math.floor(t%60)).padStart(2,"0");
+function ev(m){const d=document.createElement("div");d.innerHTML="["+fmt(S.t)+"] "+m;const l=$("log");l.prepend(d);while(l.children.length>40)l.lastChild.remove()}
+function mbs(){$("mbn").textContent=MT[S.m].n;$("mbs").textContent=(MT[S.m].k+" · Cenário "+SC[cur][0])}
+function scen(i){const s=SC[i];cur=i;S.pk=0;S.T=s[1]==null?P.Ta+pl(s[2])/P.h:s[1];S.L=s[2];S.Lt=s[3];S.t=0;S.age=0;S.gas=0;S.fault=0;S.b1=0;S.trip=0;S.sg=0;S.op=0;S.inr=0;S.sc=null;S.hist=[];S.hn=0;S.F=[0,0];S.A=0;ctl(S,S.T,MT[S.m]);$("sl").value=Math.round(s[3]*100);$("ls").textContent=Math.round(s[3]*100)+" %";if(i==6)energ();else $("sn").style.display="none";
+ document.querySelectorAll("#sc button").forEach((b,j)=>b.classList.toggle("on",j==i));$("log").innerHTML="";pkUi();ev("Cenário <b>"+s[0]+"</b> — T₀ = "+fm(S.T)+" °C");mbs()}
+function step(d){const M=MT[S.m];S.L=S.op?S.L*Math.exp(-d/.5):S.Lt;const o=[S.F[0],S.F[1],S.A];ctl(S,S.T,M);
+ bh(d);const Pl=pe(),Q=P.h*(S.T-P.Ta)+S.F[0]*M.q[0]+S.F[1]*M.q[1];S.T+=d*(Pl-Q)/P.C;S.t+=d;S.inr*=Math.exp(-d/1.2);if(S.inr<.01)S.inr=0;script();S.age+=d*Math.pow(2,(S.T+P.g*Math.pow(S.L,P.y)-98)/6);
+ for(let i=0;i<2;i++)if(o[i]!=S.F[i])ev(M.act[i]+" → <b>"+(S.F[i]?"ON":"OFF")+"</b> (T = "+fm(S.T)+" °C)");
+ if(o[2]!=S.A)ev("Alarme "+(S.A?"<b>ACTIVADO</b> — condição crítica":"desactivado")+" (T = "+fm(S.T)+" °C)");
+ if(S.t>=S.hn){S.hist.push([S.t,S.T,S.F[0],S.F[1],S.A]);S.hn+=1;if(S.hist.length>300)S.hist.shift()}}
+/* ---------- 3D ---------- */
+const cv=$("cv"),R=new THREE.WebGLRenderer({canvas:cv,antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;
+const sc=new THREE.Scene();sc.background=new THREE.Color(0x0a0e15);sc.fog=new THREE.Fog(0x0a0e15,22,52);
+const cm=new THREE.PerspectiveCamera(40,1,.1,100);
+sc.add(new THREE.HemisphereLight(0xcfe3ff,0x1a2030,.75));
+const sun=new THREE.DirectionalLight(0xffffff,.9);sun.position.set(6,11,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-10,right:10,top:10,bottom:-10,far:35});sc.add(sun);
+const M=(c,r=.55,m=.25)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const mD=M(0x20262f),mM=M(0x9aa5b4,.35,.7),mP=M(0x8a4b2d,.35,.1),mG=M(0x59626f,.9,.1),mPu=M(0x2b6cb0,.4,.5),mY=M(0xffd27a,.4,.3),mOil=M(0xc0652a,.4,.5),mWat=M(0x2f8fd0,.4,.5);
+function bx(w,h,d,m,x,y,z,p){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;(p||sc).add(o);return o}
+function cy(a,b,h,m,x,y,z,p,rx,rz){const o=new THREE.Mesh(new THREE.CylinderGeometry(a,b,h,28),m);o.position.set(x,y,z);if(rx)o.rotation.x=rx;if(rz)o.rotation.z=rz;o.castShadow=true;(p||sc).add(o);return o}
+const gr=new THREE.Mesh(new THREE.PlaneGeometry(80,80),M(0x1a212c,.95,0));gr.rotation.x=-Math.PI/2;gr.receiveShadow=true;sc.add(gr);
+const gh=new THREE.GridHelper(40,40,0x2a3547,0x1e2735);gh.position.y=.01;sc.add(gh);
+bx(11,.2,9.4,M(0x4a525f,.95,0),0,.1,.6);
+const TR=new THREE.Group();sc.add(TR);
+const tk=M(0x3a5a7a,.45,.5);
+bx(4.5,.3,2.6,mD,0,.35,0,TR);const tank=bx(4.2,2.4,2.4,tk,0,1.7,0,TR);const cover=bx(4.4,.14,2.6,mG,0,2.96,0,TR);
+for(let i=-3;i<=3;i++)bx(.08,2.2,.06,tk,i*.55,1.7,1.23,TR);
+const radM=tk.clone();radM.transparent=true;radM.opacity=.4;radM.depthWrite=false;const rad=[];for(let i=0;i<9;i++)rad.push(bx(.55,1.6,.05,radM,2.65,1.75,-1+i*.25,TR));
+const pipeM=new THREE.MeshStandardMaterial({color:0x8fa3b8,transparent:true,opacity:.4,metalness:.5,roughness:.3,depthWrite:false}),glass=new THREE.MeshStandardMaterial({color:0xcfe3f5,transparent:true,opacity:.28,roughness:.05,metalness:.1,depthWrite:false}),oilGl=new THREE.MeshStandardMaterial({color:0xe08a30,emissive:0x5a2a00,transparent:true,opacity:.8,roughness:.2});
+cy(.09,.09,2.2,pipeM,2.4,2.6,0,TR,Math.PI/2);cy(.09,.09,2.2,pipeM,2.4,.95,0,TR,Math.PI/2);
+[2.6,.95].forEach(y=>[-.6,.6].forEach(z=>cy(.07,.07,.35,pipeM,2.25,y,z,TR,0,Math.PI/2)));
+cy(.3,.3,3,glass,0,3.75,-.8,TR,0,Math.PI/2);const cOil=bx(2.9,.3,.36,oilGl,0,3.6,-.8,TR);bx(.1,.55,.1,mD,-1,3.25,-.8,TR);bx(.1,.55,.1,mD,.4,3.25,-.8,TR);
+
+cy(.2,.2,.05,M(0xeeeeee),-1.55,3.75,-.8,TR,0,Math.PI/2);
+for(let i=0;i<3;i++){const z=-.25+i*.45;for(let k=0;k<6;k++){cy(.2-k*.012,.2-k*.012,.04,mP,-1,3.1+k*.17,z,TR);}cy(.09,.07,1.1,mP,-1,3.55,z,TR);cy(.05,.05,.7,mP,.6,3.4,z,TR);for(let k=0;k<3;k++)cy(.13,.13,.04,mP,.6,3.2+k*.2,z,TR)}
+cy(.14,.14,.06,M(0xf2f2f2),1.0,2.6,1.25,TR,Math.PI/2);cy(.015,.015,.12,M(0xcc2222),1.0,2.6,1.3,TR,0,0).rotation.set(0,0,.9);
+/* ventiladores */
+const fans=[];function mkFan(z,y){const u=new THREE.Group();u.position.set(3.15,y,z);u.rotation.y=Math.PI/2;TR.add(u);
+ const sh=new THREE.Mesh(new THREE.CylinderGeometry(.47,.47,.26,32,1,true),new THREE.MeshStandardMaterial({color:0x20262f,side:2,roughness:.5,metalness:.4}));sh.rotation.x=Math.PI/2;u.add(sh);
+ [.46,.3,.16].forEach(r=>{const t=new THREE.Mesh(new THREE.TorusGeometry(r,.012,6,40),mM);t.position.z=.14;u.add(t)});
+ for(let i=0;i<4;i++){const s=new THREE.Mesh(new THREE.BoxGeometry(.94,.014,.014),mM);s.position.z=.14;s.rotation.z=i*Math.PI/4;u.add(s)}
+ cy(.1,.1,.16,mD,0,0,-.08,u,Math.PI/2);const rot=new THREE.Group();u.add(rot);cy(.08,.08,.12,M(0xcfd6df,.3,.7),0,0,.02,rot,Math.PI/2);
+ for(let i=0;i<5;i++){const p=new THREE.Group();p.rotation.z=i*2*Math.PI/5;const b=bx(.34,.1,.012,M(0xdfe6ee,.3,.6),.25,0,.03,p);b.rotation.x=.45;rot.add(p)}
+ bx(.06,.06,.4,mD,0,0,-.15,u);return{u,rot,z,y}}
+fans.push(mkFan(.5,1.75),mkFan(-.5,1.75));
+fans.forEach(f=>{const n=70,g=new THREE.BufferGeometry(),a=new Float32Array(n*3),v=[];for(let i=0;i<n;i++){v.push(1.5+Math.random()*2);a[i*3]=3.3+Math.random()*4;a[i*3+1]=f.y+(Math.random()-.5)*.8;a[i*3+2]=f.z+(Math.random()-.5)*.8}
+ g.setAttribute("position",new THREE.BufferAttribute(a,3));f.pm=new THREE.PointsMaterial({color:0x9fd6ff,size:.07,transparent:true,opacity:0,depthWrite:false});f.pt=new THREE.Points(g,f.pm);f.v=v;sc.add(f.pt)});
+/* bombas */
+function mkPump(x,y,z){const g=new THREE.Group();g.position.set(x,y,z);TR.add(g);
+ const b=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.5,24),mPu);b.rotation.x=Math.PI/2;b.castShadow=true;g.add(b);
+ const mo=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.3,20),mD);mo.rotation.x=Math.PI/2;mo.position.z=-.38;g.add(mo);
+ const rot=new THREE.Group();rot.position.z=.26;g.add(rot);
+ const dk=new THREE.Mesh(new THREE.CylinderGeometry(.16,.16,.03,20),M(0x1b4a7a));dk.rotation.x=Math.PI/2;rot.add(dk);
+ for(let i=0;i<3;i++){const s=bx(.32,.05,.02,mY,0,0,.02,rot);s.rotation.z=i*Math.PI/3}
+ return{g,rot}}
+const pA=mkPump(2.4,.95,1.45),pB=mkPump(2.4,2.6,1.45),wP=mkPump(3.7,.7,-1.6);
+/* permutador óleo-água */
+const hx=new THREE.Group();TR.add(hx);
+cy(.5,.5,2.2,M(0x2d6a8f,.35,.6),3.7,1.5,0,hx);for(let k=0;k<5;k++)cy(.53,.53,.06,mM,3.7,.6+k*.45,0,hx);
+cy(.4,.4,.12,mD,3.7,2.65,0,hx);cy(.4,.4,.12,mD,3.7,.35,0,hx);
+cy(.09,.09,.9,mOil,2.85,.95,0,hx,0,Math.PI/2);cy(.09,.09,.9,mOil,2.85,2.6,0,hx,0,Math.PI/2);
+cy(.09,.09,2.2,mWat,3.7,2.3,-1.6,hx,Math.PI/2);cy(.09,.09,2.2,mWat,3.7,.7,-1.6,hx,Math.PI/2);
+const wt=cy(.7,.7,2,new THREE.MeshStandardMaterial({color:0x7fc4ef,roughness:.2,metalness:.1,transparent:true,opacity:.75}),3.7,1.3,-3.3,hx);
+/* fluxo (partículas em tubagens) */
+function mkFlow(n,color,segs){const g=new THREE.BufferGeometry(),a=new Float32Array(n*3),s=[],sg=[];for(let i=0;i<n;i++){s.push(Math.random());sg.push(i%segs.length)}
+ g.setAttribute("position",new THREE.BufferAttribute(a,3));const m=new THREE.PointsMaterial({color,size:.1,transparent:true,opacity:.9,depthWrite:false});const p=new THREE.Points(g,m);sc.add(p);return{p,m,s,sg,segs,n,a,g,vv:Array.from({length:n},()=>.75+.5*Math.random())}}
+function runFlow(f,sp,dt){for(let i=0;i<f.n;i++){f.s[i]=(f.s[i]+sp*dt/2.2*f.vv[i])%1;const q=f.segs[f.sg[i]],s=f.s[i];f.a[i*3]=q[0]+(q[3]-q[0])*s;f.a[i*3+1]=q[1]+(q[4]-q[1])*s+Math.sin(s*30+i)*.015;f.a[i*3+2]=q[2]+(q[5]-q[2])*s+Math.cos(s*25+i)*.015}f.g.attributes.position.needsUpdate=true}
+const oilF=mkFlow(40,0xffa14a,[[2.4,.95,-1.1,2.4,.95,1.1],[2.4,2.6,1.1,2.4,2.6,-1.1]]);
+const watF=mkFlow(40,0x4db5ff,[[3.7,2.3,-.5,3.7,2.3,-2.7],[3.7,.7,-2.7,3.7,.7,-.5]]);
+/* interior: núcleo, enrolamentos, circuito de óleo, Buchholz */
+tank.material=tank.material.clone();tank.material.transparent=true;cover.material=cover.material.clone();cover.material.transparent=true;
+const IN=new THREE.Group();TR.add(IN);const mC=M(0x38414d,.4,.8),mHV=new THREE.MeshStandardMaterial({color:0xc9772e,roughness:.35,metalness:.7}),mLV=M(0x5b86b3,.4,.5),OX=[-1.2,0,1.2];
+bx(3.7,.2,.55,mC,0,.97,0,IN);bx(3.7,.2,.55,mC,0,2.55,0,IN);
+OX.forEach(x=>{bx(.4,1.6,.5,mC,x,1.76,0,IN);cy(.36,.36,1.45,mLV,x,1.76,0,IN);for(let i=0;i<12;i++)cy(.52,.52,.085,mHV,x,1.12+i*.115,0,IN)});
+const ON=160,og=new THREE.BufferGeometry(),oa=new Float32Array(ON*3),oc=new Float32Array(ON*3),os=[],ol=[],oz=[],ow=[];
+for(let i=0;i<ON;i++){os.push(Math.random());ol.push(i%3);oz.push(-1+Math.floor(Math.random()*9)*.25);ow.push(Math.random()*6.28)}
+og.setAttribute("position",new THREE.BufferAttribute(oa,3));og.setAttribute("color",new THREE.BufferAttribute(oc,3));
+TR.add(new THREE.Points(og,new THREE.PointsMaterial({size:.08,vertexColors:true,transparent:true,opacity:.95,depthWrite:false})));
+const ovl=Array.from({length:ON},()=>.75+.5*Math.random()),oph=Array.from({length:ON},()=>Math.random()*6.28),oin=[];
+function oilPos(i,s){const x0=OX[ol[i]]+Math.cos(ow[i])*.46,rz=Math.sin(ow[i])*.46,rx=S.m==3?3.7:2.65,zr=S.m==3?oz[i]*.3:oz[i],h=rx-x0,tot=2*(1.9+h);let d=s*tot,k;
+ if(d<1.9){k=d/1.9;return[x0,.7+1.9*k,rz,.3+.7*k,1.3]}d-=1.9;
+ if(d<h){k=d/h;return[x0+h*k,2.6,rz+(zr-rz)*k,1,1]}d-=h;
+ if(d<1.9){k=d/1.9;return[rx+(S.m==3?0:Math.sin(ow[i]*3)*.1),2.6-1.9*k,zr,1-.8*k,.85]}d-=1.9;k=d/h;return[rx-h*k,.7,zr+(rz-zr)*k,.2+.1*k,.75]}
+function oil(v,now,dt){const heat=Math.max(.2,Math.min(1,(S.T-30)/60)),al=1-Math.exp(-dt*9);
+ for(let i=0;i<ON;i++){let p=oilPos(i,os[i]);os[i]+=v*dt*.01*ovl[i]*p[4];const wr=os[i]>=1;if(wr)os[i]-=1;p=oilPos(i,os[i]);
+  const tw=Math.sin(now/650+oph[i]*3+os[i]*14)*.035,tz=Math.cos(now/800+oph[i]*2+os[i]*11)*.03,tb=Math.sin(now/500+oph[i]*4)*.015,f=p[3]*heat;
+  if(wr||!oin[i]){oin[i]=1;oa[i*3]=p[0];oa[i*3+1]=p[1];oa[i*3+2]=p[2]}
+  else{oa[i*3]+=(p[0]+tw-oa[i*3])*al;oa[i*3+1]+=(p[1]+tb-oa[i*3+1])*al;oa[i*3+2]+=(p[2]+tz-oa[i*3+2])*al}
+  oc[i*3]=.25+.75*f;oc[i*3+1]=.6-.2*f;oc[i*3+2]=1-.85*f}
+ og.attributes.position.needsUpdate=og.attributes.color.needsUpdate=true}
+let tx=0,ov=.5;const gcl=new THREE.Color(0xcfe3f5);const RX=1.75,RY=3.75,RZ=-.8,gasM=new THREE.MeshStandardMaterial({color:0xf4f9ff,transparent:true,opacity:.6,roughness:.1});
+cy(.09,.09,.72,pipeM,2,3.39,RZ,TR);const elb=new THREE.Mesh(new THREE.SphereGeometry(.095,14,10),pipeM);elb.position.set(2,3.75,RZ);TR.add(elb);cy(.09,.09,.5,pipeM,1.75,3.75,RZ,TR,0,Math.PI/2);
+cy(.21,.21,.26,M(0x1f3a52,.3,.6),RX,RY,RZ,TR,0,Math.PI/2);cy(.13,.13,.04,mM,1.55,RY,RZ,TR,0,Math.PI/2);cy(.13,.13,.04,mM,1.95,RY,RZ,TR,0,Math.PI/2);cy(.16,.16,.34,glass.clone(),RX,4.13,RZ,TR);
+const oilFill=cy(.13,.13,.3,oilGl,RX,4.13,RZ,TR),gasFill=cy(.13,.13,.3,gasM,RX,4.13,RZ,TR),fl2=new THREE.Mesh(new THREE.SphereGeometry(.045,12,8),M(0xff3b3b));fl2.position.set(RX,4,RZ);TR.add(fl2);
+const rl=new THREE.Mesh(new THREE.SphereGeometry(.035,10,8),new THREE.MeshStandardMaterial({color:0x330000,emissive:0x220000}));rl.position.set(RX+.19,4.25,RZ);TR.add(rl);bx(.07,.07,.07,mD,RX+.19,4.18,RZ,TR);cy(.025,.025,.12,M(0xcc2222),RX,RY-.27,RZ,TR);
+const oilC=mkFlow(16,0xffa14a,[[2,3.05,RZ,2,3.75,RZ],[2,3.75,RZ,1.5,3.75,RZ]]);
+const bn=24,bgm=new THREE.BufferGeometry(),ba=new Float32Array(bn*3),bs=Array.from({length:bn},()=>Math.random()),bP=new THREE.Points(bgm,new THREE.PointsMaterial({color:0xffffff,size:.035,transparent:true,opacity:0,depthWrite:false}));bgm.setAttribute("position",new THREE.BufferAttribute(ba,3));TR.add(bP);
+function bhv(dt,now){const g=S.gas,sh=S.sg>0?Math.sin(now/40)*.05:0,st=S.trip?2:S.b1?1:0;
+ oilFill.scale.y=Math.max(.02,1-g+sh);oilFill.position.y=3.98+.15*oilFill.scale.y;gasFill.scale.y=Math.max(.01,g);gasFill.position.y=4.28-.15*gasFill.scale.y;fl2.position.y=3.98+.3*oilFill.scale.y-.025;
+ rl.material.emissive.setHex(st&&((now/300|0)%2)?0xff2200:0x220000);const act=(S.fault==1&&!S.trip)||S.sg>0;bP.material.opacity=act?.9:0;
+ if(act)for(let i=0;i<bn;i++){bs[i]=(bs[i]+dt*(S.sg>0?1.5:.5))%1;ba[i*3]=RX+.05*Math.sin(bs[i]*25+i);ba[i*3+1]=3.85+.4*bs[i];ba[i*3+2]=RZ+.05*Math.cos(bs[i]*25+i)}
+ bgm.attributes.position.needsUpdate=true}
+/* subestação de AT: pórtico → seccionador → disjuntor → TC → transformador */
+const BX=-4.8,PZ=[-.25,.2,.65],mWr=new THREE.MeshStandardMaterial({color:0x9aa5b4,metalness:.8,roughness:.3,emissive:0x1a66ff,emissiveIntensity:0}),mSr=new THREE.MeshStandardMaterial({color:0x9aa5b4,metalness:.8,roughness:.3,emissive:0x1a66ff,emissiveIntensity:.6}),mPor=M(0xb9a58a,.35,.1),mSt=M(0x7b8696,.5,.4),mHd=M(0x8a97a8,.4,.6);
+function wire(a,b,m){const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A),o=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,d.length(),8),m);o.position.copy(A).addScaledVector(d,.5);o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());TR.add(o)}
+bx(7.2,.1,2.8,M(0x6f757d,.9,0),-5.8,.05,.5,TR);
+[-.7,1.1].forEach(z=>cy(.07,.09,5.2,mG,-8.4,2.6,z,TR));bx(.1,.1,2,mG,-8.4,5.2,.2,TR);
+bx(1.2,.2,1.7,mG,-6.6,.2,.2,TR);bx(.8,.5,1.5,mSt,BX,.4,.2,TR);bx(.9,.9,.5,mSt,BX,.75,1.45,TR);
+const cbM=[];
+PZ.forEach(z=>{cy(.035,.035,.5,mPor,-8.4,4.95,z,TR);
+ [-6.9,-6.3].forEach(x=>{cy(.1,.12,1.5,mPor,x,1,z,TR);cy(.07,.07,.06,mM,x,1.78,z,TR)});bx(.8,.05,.06,mM,-6.6,1.8,z,TR);
+ cy(.12,.14,1.2,mPor,BX,1.25,z,TR);cy(.17,.17,.9,glass.clone(),BX,2.35,z,TR);cy(.2,.2,.08,mM,BX,2.84,z,TR);cy(.04,.04,.5,mM,BX,2.55,z,TR);cbM.push(cy(.04,.04,.5,mM,BX,2.1,z,TR));cy(.2,.2,.08,mM,BX,1.88,z,TR);
+ bx(.4,.3,.4,mG,-3.4,.3,z,TR);cy(.1,.12,1.3,mPor,-3.4,1.1,z,TR);cy(.2,.2,.4,mHd,-3.4,2,z,TR);cy(.05,.05,.1,mM,-3.4,2.25,z,TR);
+ wire([-12,5.3,z],[-8.4,4.7,z],mSr);wire([-8.4,4.7,z],[-6.9,1.85,z],mSr);wire([-6.3,1.85,z],[BX,2.9,z],mSr);
+ wire([BX,1.9,z],[-3.4,2.1,z],mWr);wire([-3.4,2.3,z],[-1,4.15,z],mWr)});
+const arc=new THREE.Mesh(new THREE.SphereGeometry(.07,10,8),new THREE.MeshBasicMaterial({color:0xcfe6ff,transparent:true,opacity:.9})),arcL=new THREE.PointLight(0x9fc4ff,0,3);arc.visible=false;arc.position.set(BX,2.2,PZ[1]);arcL.position.copy(arc.position);TR.add(arc);TR.add(arcL);
+const lmR=new THREE.Mesh(new THREE.SphereGeometry(.04,10,8),new THREE.MeshStandardMaterial({color:0x330000,emissive:0x000000})),lmG=new THREE.Mesh(new THREE.SphereGeometry(.04,10,8),new THREE.MeshStandardMaterial({color:0x003300,emissive:0x000000}));lmR.position.set(BX-.22,.4,1.72);lmG.position.set(BX+.22,.4,1.72);TR.add(lmR);TR.add(lmG);cy(.1,.1,.03,M(0xeeeeee),BX+.28,1.12,1.71,TR,Math.PI/2);
+const ic=document.createElement("canvas");ic.width=256;ic.height=160;const ix=ic.getContext("2d"),itx=new THREE.CanvasTexture(ic),im=new THREE.Mesh(new THREE.PlaneGeometry(.7,.44),new THREE.MeshBasicMaterial({map:itx}));im.position.set(BX,.85,1.71);TR.add(im);let cbp=1,lastC=-1,ops=0;
+function cbAnim(dt,now){const tg=(S.trip||S.op)?0:1,mv=Math.abs(tg-cbp)>.03;cbp+=(tg-cbp)*(1-Math.exp(-dt*(tg?9:14)));cbM.forEach(m=>m.position.y=1.85+.25*cbp);arc.visible=mv;if(mv){arc.scale.setScalar((.6+Math.random()*1.2)*(.7+Math.min(1.3,S.L)));arcL.intensity=(2+Math.random()*4)*(.5+Math.min(1.3,S.L))}else arcL.intensity=0;
+ mWr.emissiveIntensity=cbp*(.5+.3*Math.sin(now/120));lmR.material.emissive.setHex(tg?0xff2200:0x000000);lmG.material.emissive.setHex(tg?0x000000:0x00ff44);
+ if(tg!=lastC){if(lastC!=-1)ops++;lastC=tg;ix.fillStyle=tg?"#7a1010":"#0f4d2a";ix.fillRect(0,0,256,160);ix.fillStyle="#fff";ix.textAlign="center";ix.font="bold 28px sans-serif";ix.fillText("DISJUNTOR 33 kV",128,38);ix.font="bold 46px sans-serif";ix.fillText(tg?"FECHADO":"ABERTO",128,98);ix.font="20px sans-serif";ix.fillText("Operações: "+ops,128,136);itx.needsUpdate=true}}
+/* armário, ecrã, alarme */
+bx(1.1,1.9,.55,M(0x7b8696,.5,.4),-3.4,1.15,1.9);bx(1.16,.06,.6,mD,-3.4,2.13,1.9);
+const scr=document.createElement("canvas");scr.width=512;scr.height=320;const sx=scr.getContext("2d"),stx=new THREE.CanvasTexture(scr);
+const sm=new THREE.Mesh(new THREE.PlaneGeometry(.86,.54),new THREE.MeshBasicMaterial({map:stx}));sm.position.set(-3.4,1.6,2.185);sc.add(sm);
+cy(.04,.04,.7,mM,-3.4,2.5,1.9);cy(.12,.12,.06,mD,-3.4,2.18,1.9);
+const lm=new THREE.MeshStandardMaterial({color:0x661111,emissive:0xff0000,emissiveIntensity:.05,roughness:.2});cy(.11,.11,.2,lm,-3.4,2.95,1.9);
+const dome=new THREE.Mesh(new THREE.SphereGeometry(.11,16,10,0,6.28,0,1.57),lm);dome.position.set(-3.4,3.05,1.9);sc.add(dome);
+const pLt=new THREE.PointLight(0xff2020,0,9);pLt.position.set(-3.4,3.1,1.9);sc.add(pLt);
+function drawScr(){const Mm=MT[S.m];sx.fillStyle="#04101a";sx.fillRect(0,0,512,320);sx.fillStyle="#0e2a40";sx.fillRect(0,0,512,44);sx.fillStyle="#7fd0ff";sx.font="bold 22px sans-serif";sx.fillText("TR-01 · "+Mm.sn.toUpperCase().slice(0,22),16,30);
+ const c=S.T<P.T1?"#38d68b":S.T<P.T2?"#ffb020":S.T<P.T3?"#ff7a2f":"#ff4d4f";sx.fillStyle=c;sx.font="bold 92px sans-serif";sx.fillText(fm(S.T),20,150);sx.font="bold 34px sans-serif";sx.fillText("°C",330,150);
+ sx.fillStyle="#223348";sx.fillRect(20,175,472,14);sx.fillStyle=c;sx.fillRect(20,175,472*Math.max(0,Math.min(1,(S.T-20)/90)),14);
+ [["A1",S.F[0],"#38d68b",Mm.na>0],["A2",S.F[1],"#38d68b",Mm.na>1],["ALARME",S.A,"#ff4d4f",true]].forEach((e,i)=>{const x=20+i*160;sx.fillStyle=e[1]?e[2]:"#223348";sx.fillRect(x,212,148,52);sx.fillStyle=e[1]?"#04110a":"#6d7f95";sx.font="bold 24px sans-serif";sx.fillText(e[3]?e[0]+(e[1]?" ON":" OFF"):e[0]+" —",x+10,247)});
+ sx.fillStyle="#8fb2d0";sx.font="18px sans-serif";sx.fillText("Carga "+Math.round(S.L*100)+" %   ·   t = "+fmt(S.t),20,300);stx.needsUpdate=true}
+/* rótulos */
+const LD=[
+ {t:m=>"Transformador",p:[0,3.15,1.3],v:m=>1},
+ {t:m=>"Radiadores",p:[2.7,2.75,0],v:m=>m!=3},
+ {t:m=>"Ventilador 1 (1.º nível)",p:[3.4,2.4,.5],v:m=>m==1},
+ {t:m=>"Ventilador 2 (2.º nível)",p:[3.4,2.4,-.5],v:m=>m==1},
+ {t:m=>"Ventiladores (2.º nível)",p:[3.4,2.45,0],v:m=>m==2},
+ {t:m=>m==4?"Bomba 1 (1.º nível)":"Bomba de óleo (1.º nível)",p:[2.4,1.35,1.5],v:m=>m>=2},
+ {t:m=>"Bomba 2 (2.º nível)",p:[2.4,3.0,1.5],v:m=>m==4},
+ {t:m=>"Permutador óleo-água",p:[3.7,2.85,0],v:m=>m==3},
+ {t:m=>"Bomba de água (2.º nível)",p:[3.7,1.05,-1.6],v:m=>m==3},
+ {t:m=>"Depósito de água",p:[3.7,2.45,-3.3],v:m=>m==3},
+ {t:m=>"Relé de Buchholz",p:[1.75,4.5,-.8],v:m=>1},{t:m=>"Tubagem tanque → conservador",p:[2,3.3,-.8],v:m=>1},
+ {t:m=>"Conservador",p:[-.5,4.15,-.8],v:m=>1},
+ {t:m=>"Sensor de temperatura",p:[1,2.8,1.3],v:m=>1},
+ {t:m=>"Alarme",p:[-3.4,3.3,1.9],v:m=>1},{t:m=>"Pórtico da rede (33 kV)",p:[-8.4,5.6,.2],v:m=>1},{t:m=>"Seccionador",p:[-6.6,2.3,.2],v:m=>1},{t:m=>"Disjuntor de AT 33 kV",p:[-4.8,3.25,.2],v:m=>1},{t:m=>"TC (corrente)",p:[-3.4,2.65,.2],v:m=>1},{t:m=>"Indicador de posição",p:[-4.8,1.5,1.75],v:m=>1},{t:m=>"Enrolamentos AT/BT",p:[0,2.75,0],v:m=>S.int},{t:m=>"Núcleo laminado",p:[0,.8,0],v:m=>S.int}].map(a=>{const e=document.createElement("div");e.className="l";$("lbl").appendChild(e);return{e,t:a.t,v:a.v,p:new THREE.Vector3(...a.p)}});
+let showL=true;
+function vis(){const m=S.m;rad.forEach(r=>r.visible=m!=3);fans.forEach(f=>{f.u.visible=f.pt.visible=(m==1||m==2)});pA.g.visible=m>=2;pB.g.visible=m==4;wP.g.visible=m==3;hx.visible=m==3;watF.p.visible=m==3;
+ LD.forEach(l=>l.e.textContent=l.t(m))}
+/* câmara: órbita com inércia, mover, pinça, toque duplo e voos suaves */
+const V=[{a:.6,e:.3,d:13,t:[0,1.9,0]},{a:1.3,e:.15,d:8.5,t:[3.2,1.75,-.4]},{a:-.15,e:.1,d:6,t:[-3.4,2.2,1.9]},{a:.45,e:.2,d:3.4,t:[1.75,3.95,-.8]},{a:-.45,e:.15,d:10,t:[-5.4,2,.4]},{a:.35,e:.1,d:7.5,t:[0,1.7,0]}];
+const cs={a:.6,e:.3,d:13,t:new THREE.Vector3(0,1.9,0)},gs={a:.6,e:.3,d:13,t:new THREE.Vector3(0,1.9,0)},vel={a:0,e:0};
+let idle=true,orbit=false,curView=0,vw=1,vh=1,vtx=0,vty=0,vox=0,voy=0;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),wrapA=x=>Math.atan2(Math.sin(x),Math.cos(x)),v3=new THREE.Vector3();
+function view(i){curView=i;const v=V[i];gs.a=cs.a+wrapA(v.a-cs.a);gs.e=v.e;gs.d=v.d;gs.t.set(v.t[0],v.t[1],v.t[2]);vel.a=vel.e=0;
+ document.querySelectorAll("[data-v]").forEach(b=>b.classList.toggle("on",+b.dataset.v==i))}
+function orbitOff(){if(orbit){orbit=false;$("orb").classList.remove("on")}}
+function panBy(dx,dy){const k=gs.d*.0017,c=Math.cos(gs.a),s=Math.sin(gs.a);gs.t.x=clamp(gs.t.x-dx*k*c,-13,8);gs.t.z=clamp(gs.t.z+dx*k*s,-6,6);gs.t.y=clamp(gs.t.y+dy*k,.2,6.5)}
+const ptr=new Map();let pinch=null,lastMv=0,moved=0,tapT=0,downT=0;
+cv.addEventListener("contextmenu",e=>e.preventDefault());
+cv.addEventListener("pointerdown",e=>{try{cv.setPointerCapture(e.pointerId)}catch(x){}
+ ptr.set(e.pointerId,{x:e.clientX,y:e.clientY,b:e.button,sh:e.shiftKey});idle=false;orbitOff();vel.a=vel.e=0;downT=lastMv=performance.now();
+ if(ptr.size==1)moved=0;
+ if(ptr.size==2){const [p,q]=[...ptr.values()];pinch={d:Math.hypot(p.x-q.x,p.y-q.y),D:gs.d,mx:(p.x+q.x)/2,my:(p.y+q.y)/2};moved=99}});
+cv.addEventListener("pointermove",e=>{const p=ptr.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;
+ if(pinch&&ptr.size==2){const [a,b]=[...ptr.values()],dd=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;gs.d=clamp(pinch.D*pinch.d/Math.max(dd,24),2.5,30);panBy(mx-pinch.mx,my-pinch.my);pinch.mx=mx;pinch.my=my;return}
+ moved+=Math.abs(dx)+Math.abs(dy);
+ if(p.b==2||p.b==1||p.sh){panBy(dx,dy);return}
+ const t=performance.now(),dt=Math.max(.008,(t-lastMv)/1000);lastMv=t;
+ gs.a-=dx*.0065;gs.e=clamp(gs.e+dy*.0055,.02,1.45);
+ vel.a=clamp(.55*vel.a+.45*(-dx*.0065/dt),-8,8);vel.e=clamp(.55*vel.e+.45*(dy*.0055/dt),-5,5)});
+const pUp=e=>{if(!ptr.delete(e.pointerId))return;if(ptr.size<2)pinch=null;const t=performance.now();
+ if(t-lastMv>90)vel.a=vel.e=0;
+ if(ptr.size==0&&moved<8&&t-downT<350){if(t-tapT<350){tapT=0;view(curView)}else{tapT=t;if(innerWidth<=820&&openP)openPanel(openP)}}};
+cv.addEventListener("pointerup",pUp);cv.addEventListener("pointercancel",pUp);
+cv.addEventListener("wheel",e=>{e.preventDefault();idle=false;orbitOff();gs.d=clamp(gs.d*Math.exp(clamp(e.deltaY,-120,120)*(e.ctrlKey?.01:.0014)),2.5,30)},{passive:false});
+/* deslocamento do enquadramento: o modelo fica centrado na área livre (fora dos painéis) */
+function calcVO(){const wide=innerWidth>820&&innerHeight>560,sh=$("sheet").getBoundingClientRect();
+ if(wide){const L0=$("tabs").getBoundingClientRect().right+8,R0=openP?sh.left-8:vw;vtx=vw/2-(L0+R0)/2;vty=0}
+ else{const T0=$("tcard").getBoundingClientRect().bottom+4,B0=openP?sh.top-4:$("tr").getBoundingClientRect().top-4;vtx=0;vty=vh/2-(T0+B0)/2}}
+function resize(){const r=$("vp").getBoundingClientRect();vw=r.width;vh=r.height;R.setSize(vw,vh,false);cm.aspect=vw/vh;cm.updateProjectionMatrix();calcVO()}
+new ResizeObserver(resize).observe($("vp"));
+/* gráfico */
+const ch=$("ch"),cx=ch.getContext("2d");
+function draw(){const dp=devicePixelRatio||1,w=ch.clientWidth,h=ch.clientHeight;if(!w||!h)return;if(ch.width!=w*dp){ch.width=w*dp;ch.height=h*dp}cx.setTransform(dp,0,0,dp,0,0);cx.clearRect(0,0,w,h);
+ const X0=30,Y0=6,W=w-X0-6,H=h-Y0-26,y=T=>Y0+H*(1-(Math.max(20,Math.min(110,T))-20)/90);cx.font="10px sans-serif";cx.lineWidth=1;
+ [20,40,60,75,85,95,110].forEach(T=>{const c=T==60?"#38d68b":T==75?"#ffb020":T==85?"#ff7a2f":T==95?"#ff4d4f":"rgba(128,140,160,.3)";cx.strokeStyle=c;cx.setLineDash(T==60||T==75||T==85||T==95?[4,3]:[]);cx.beginPath();cx.moveTo(X0,y(T));cx.lineTo(X0+W,y(T));cx.stroke();cx.fillStyle="#8f9db3";cx.fillText(T,4,y(T)+3)});cx.setLineDash([]);
+ const hs=S.hist;if(hs.length<2)return;const t0=hs[0][0],t1=Math.max(hs[hs.length-1][0],t0+60),x=t=>X0+W*(t-t0)/(t1-t0);
+ [[2,"#38d68b"],[3,"#ffb020"],[4,"#ff4d4f"]].forEach((s,r)=>{cx.fillStyle=s[1];for(let i=0;i<hs.length-1;i++)if(hs[i][s[0]])cx.fillRect(x(hs[i][0]),Y0+H+4+r*6,Math.max(1,x(hs[i+1][0])-x(hs[i][0])),4)});
+ cx.strokeStyle="#4da3ff";cx.lineWidth=2;cx.beginPath();hs.forEach((p,i)=>i?cx.lineTo(x(p[0]),y(p[1])):cx.moveTo(x(p[0]),y(p[1])));cx.stroke();cx.fillStyle="#8f9db3";cx.fillText("A1 · A2 · Alarme",X0,h-1);cx.fillText(fmt(t1-t0)+" de histórico",X0+W-90,h-1)}
+/* método */
+function setMethod(i){S.m=i;const Mm=MT[i];document.querySelectorAll("#mg button").forEach((b,j)=>b.classList.toggle("on",j==i));
+ $("mn").textContent=Mm.n;$("mc").textContent="§ "+Mm.sec;$("md").textContent=Mm.d;
+ $("f1k").textContent=Mm.na>0?Mm.act[0]+" (T₁)":"Actuador 1";$("f2k").textContent=Mm.na>1?Mm.act[1]+" (T₂)":"Actuador 2";
+ $("mt").innerHTML=["Normal · T &lt; "+P.T1,"1.º nível · "+P.T1+" a "+P.T2,"2.º nível · "+P.T2+" a "+P.T3,"Crítica · T ≥ "+P.T3].map((s,k)=>`<tr data-k="${k}"><td>${s} °C</td><td>${Mm.rows[k]}</td></tr>`).join("");
+ $("pf").innerHTML="Parâmetros comuns: T<sub>amb</sub> = "+P.Ta+" °C, C<sub>th</sub> = "+P.C+", h = 0,4, P₀ = 8, k<sub>L</sub> = 45; T₁ = 60, T₂ = 75, T<sub>normal</sub> = 85, T₃ = 95 °C. Método actual: q₁ = "+Mm.q[0]+", q₂ = "+Mm.q[1]+". Q<sub>ref</sub> = h·(T − T<sub>amb</sub>) + Σ F<sub>i</sub>·q<sub>i</sub>. Os actuadores desligam 2 °C abaixo do limite de activação (histerese). Os valores de q são relativos e ilustrativos (não de equipamentos reais), e T₁, T₂, T₃ seguem a prática de transformadores a óleo: óleo de topo em serviço normal 55–85 °C, alarme/disparo 90–105 °C, sobre-elevação de projeto 55–65 K. Limite superior da temperatura normal de trabalho: 85 °C.";
+ vis();scen(cur);ev("Método: <b>"+Mm.n+"</b> (2.11)")}
+/* painel matemático */
+/* ---- MathML: fórmulas com barra de fracção ---- */
+const xi=x=>`<mi>${x}</mi>`,xt=x=>`<mi mathvariant="normal">${x}</mi>`,xn=x=>`<mn>${x}</mn>`,xo=x=>`<mo>${x}</mo>`,
+xs=(a,b)=>`<msub>${xi(a)}${xt(b)}</msub>`,xf=(a,b)=>`<mfrac><mrow>${a}</mrow><mrow>${b}</mrow></mfrac>`,
+XM=x=>`<math display="block">${x}</math>`,XI=x=>`<math>${x}</math>`,nn=(v,d=1)=>xn(fm(v,d).replace("-","−")),
+rs=x=>`<mrow class="rs">${x}</mrow>`,sup=(a,b)=>`<msup>${a}<mrow>${b}</mrow></msup>`,par=x=>xo("(")+x+xo(")"),un=u=>`<mtext>&nbsp;${u}</mtext>`,
+sPp=xs("P","perdas"),sQr=xs("Q","ref"),sC=xs("C","th"),sTa=xs("T","amb"),sT0=xs("T","0"),sTe=xs("T","eq"),sk=xs("k","L"),sP0=xs("P","0"),
+sF1=xs("F","1"),sF2=xs("F","2"),sq1=xs("q","1"),sq2=xs("q","2"),sth=xs("θ","h"),DT=xf(xi("d")+xi("T"),xi("d")+xi("t")),EQ=xo("="),PL=xo("+"),MI=xo("−"),DOT=xo("⋅");
+const sFq=par(sF1+sq1+PL+sF2+sq2);
+function mathUpd(){if(!isOpen("math"))return;const Mm=MT[S.m],L=S.L,Pl=pe(),T=S.T,Fq=S.F[0]*Mm.q[0]+S.F[1]*Mm.q[1],sq=Mm.q[0]+Mm.q[1];
+ const Q=P.h*(T-P.Ta)+Fq,dT=(Pl-Q)/P.C,Teq=P.Ta+(Pl-Fq)/P.h,T0=P.Ta+Pl/P.h,Tm=P.Ta+(Pl-sq)/P.h,tau=P.C/P.h;
+ const Lm=s=>Math.sqrt(Math.max(0,(P.h*(P.T3-P.Ta)+s-P.P0)/P.kL)),L0=Lm(0),L1=Lm(sq),ok=L<=L1+1e-9;
+ const th=T+P.g*Math.pow(L,P.y),V=Math.pow(2,(th-98)/6),nx=[P.T1,P.T2,P.T3].find(x=>x>T+.01);
+ let pr,pw;const Tl=xs("T","lim");
+ if(nx&&dT>.005&&Teq>nx+.01){const t=tau*Math.log((Teq-T)/(Teq-nx));pr=XM(xi("t")+EQ+xi("τ")+DOT+xt("ln")+par(xf(sTe+MI+xi("T"),sTe+MI+Tl)))+XM(xi("t")+EQ+nn(tau,0)+DOT+xt("ln")+par(xf(nn(Teq)+MI+nn(T),nn(Teq)+MI+nn(nx,0)))+EQ+rs(nn(t,0))+un("s"));pw="Previsão: com o estado actual dos actuadores, T chega a "+nx+" °C dentro de "+fm(t,0)+" s."}
+ else{pr="";pw=dT<-.005?"A temperatura está a descer para T<sub>eq</sub> = "+fm(Teq)+" °C.":nx?"T estabiliza em T<sub>eq</sub> = "+fm(Teq)+" °C sem atingir o próximo limite ("+nx+" °C).":"Já está acima de T₃: alarme activo."}
+ const b=(n,a,w)=>`<div class="eq"><div class="n">${n}</div>${a.map(XM).join("")}<div class="w">${w}</div></div>`;
+ $("mm").innerHTML=
+ b("① Perdas (2.6.2: P = I²R, com I ∝ L)",[sPp+EQ+sP0+PL+sk+DOT+sup(xi("L"),xn(2)),sPp+EQ+xn(P.P0)+PL+xn(P.kL)+DOT+sup(par(nn(L,2)),xn(2))+EQ+rs(nn(Pl))],"P₀ = perdas fixas (núcleo). k<sub>L</sub>·L² = perdas no cobre: ao dobrar a carga, quadruplicam."+((S.trip||S.op)?" <b class=al>Disjuntor aberto: P = 0.</b>":S.fault==1?" Falha incipiente: +5 unid. de aquecimento local.":""))+
+ b("② Calor removido",[sQr+EQ+xi("h")+par(xi("T")+MI+sTa)+PL+sF1+sq1+PL+sF2+sq2,sQr+EQ+nn(P.h)+par(nn(T)+MI+nn(P.Ta,0))+PL+xn(S.F[0])+DOT+xn(Mm.q[0])+PL+xn(S.F[1])+DOT+xn(Mm.q[1])+EQ+rs(nn(Q))],"h·(T − T<sub>amb</sub>) = dissipação natural (cresce com a diferença de temperatura); F<sub>i</sub> = 1 se o actuador i está ligado.")+
+ b("③ Balanço térmico (3.7)",[sC+DOT+DT+EQ+sPp+MI+sQr+xo("⇒")+DT+EQ+xf(sPp+MI+sQr,sC),DT+EQ+xf(nn(Pl)+MI+nn(Q),xn(P.C))+EQ+rs(nn(dT,2))+un("°C/s")],"Se P > Q a temperatura sobe; se P < Q desce; se P = Q fica estável. C<sub>th</sub> grande = aquece devagar.")+
+ b("④ Temperatura de equilíbrio (dT/dt = 0)",[sTe+EQ+sTa+PL+xf(sPp+MI+sFq,xi("h")),sTe+EQ+nn(P.Ta,0)+PL+xf(nn(Pl)+MI+nn(Fq,0),nn(P.h))+EQ+rs(nn(Teq))+un("°C")],"Para onde a temperatura tende com o estado actual. Sem actuadores: "+fm(T0)+" °C · refrigeração máxima: "+fm(Tm)+" °C.")+
+ b("⑤ Constante de tempo",[xi("τ")+EQ+xf(sC,xi("h")),xi("τ")+EQ+xf(xn(P.C),nn(P.h))+EQ+rs(nn(tau,0))+un("s")],"Em 3τ ≈ "+fm(3*tau,0)+" s a temperatura percorre 95 % do caminho até T<sub>eq</sub>.")+
+ b("⑥ Evolução no tempo e previsão",[xi("T")+par(xi("t"))+EQ+sTe+PL+par(sT0+MI+sTe)+DOT+sup(xi("e"),MI+xf(xi("t"),xi("τ")))].concat(pr?[pr]:[]),pw)+
+ b("⑦ Carga máxima sem alarme (T<sub>eq</sub> ≤ T₃)",[xs("L","máx")+EQ+`<msqrt>${xf(xi("h")+par(xs("T","3")+MI+sTa)+PL+xo("Σ")+xi("q")+MI+sP0,sk)}</msqrt>`,xs("L","máx")+EQ+`<msqrt>${xf(nn(P.h)+par(nn(P.T3,0)+MI+nn(P.Ta,0))+PL+nn(sq,0)+MI+nn(P.P0,0),nn(P.kL,0))}</msqrt>`+EQ+rs(nn(L1*100,0)+xo("%"))],"Sem actuadores: "+fm(L0*100,0)+" %. Carga actual "+fm(L*100,0)+" % → <b class=\""+(ok?"on1":"al")+"\">"+(ok?"dentro do limite":"acima do limite: alarme inevitável")+"</b>.")+
+ b("⑧ Ponto quente do enrolamento (extensão, rec. 5.2)",[sth+EQ+xi("T")+PL+xi("g")+DOT+sup(xi("L"),xi("y")),sth+EQ+nn(T)+PL+xn(P.g)+DOT+sup(par(nn(L,2)),nn(P.y))+EQ+rs(nn(th))+un("°C")],"O enrolamento é mais quente que o óleo. g = "+P.g+" °C a L = 1 e y = "+P.y+" (ordem de grandeza da IEC 60076-7) são valores ilustrativos.")+
+ b("⑨ Envelhecimento do isolamento (IEC 60076-7)",[xi("V")+EQ+sup(xn(2),xf(sth+MI+xn(98),xn(6))),xi("V")+EQ+sup(xn(2),xf(nn(th)+MI+xn(98),xn(6)))+EQ+rs(xo("×")+nn(V,2))],"V = 1 a 98 °C; cada +6 °C duplica a taxa de envelhecimento. "+(V>1?"Está a envelhecer <b class=al>mais depressa</b> que o normal.":"Está a envelhecer <b class=on1>mais devagar</b> que o normal.")+" Vida consumida: "+fmt(S.age)+" (equivalente a 98 °C) em "+fmt(S.t)+" de simulação.")+
+ b("⑩ Corrente e rendimento (trifásico)",[xs("I","2")+EQ+xf(xi("S"),`<msqrt>${xn(3)}</msqrt>`+DOT+xs("V","2")),xi("η")+EQ+xf(xs("P","2"),xs("P","2")+PL+xs("P","Fe")+PL+xs("P","Cu"))],"S = L·S<sub>n</sub>; P₂ = S·cos φ; P<sub>Cu</sub> = P<sub>Cu,n</sub>·L² (perdas variáveis); P<sub>Fe</sub> é fixa.")}
+/* guia */
+function guide(){const r=(a,b,c)=>`<tr><td>${XI(a)}</td><td>${b}</td><td>${c}</td></tr>`;
+ const stp=(t,m)=>`<p>${t}</p>`+XM(m);
+ $("gd").innerHTML=`<details class="gd"><summary>📘 Significado dos símbolos</summary><table><tbody>`+
+ r(xi("T"),"Temperatura do transformador","°C")+r(sTa,"Temperatura ambiente (deslizador)","°C")+r(xi("L"),"Carga (1 = 100 %)","–")+r(sPp,"Potência térmica das perdas","unid. do modelo")+r(sQr,"Potência térmica removida","unid. do modelo")+
+ r(sC,"Capacidade térmica equivalente (40)","unid./°C")+r(xi("h"),"Coeficiente de dissipação natural (0,4)","unid./°C")+r(sF1+"," +sF2,"Estado dos actuadores (0 ou 1)","–")+r(sq1+","+sq2,"Calor removido por cada actuador","unid.")+r(xi("τ"),"Constante de tempo","s")+r(sTe,"Temperatura de equilíbrio","°C")+r(sth,"Ponto quente do enrolamento","°C")+r(xi("V"),"Taxa relativa de envelhecimento","×")+`</tbody></table></details>
+ <details class="gd"><summary>🧮 Como se chega a T(t), passo a passo</summary>`+
+ stp("1. Energia que fica = energia que entra − energia que sai (3.7):",sC+DOT+DT+EQ+sPp+MI+sQr)+
+ stp("2. Substituir o calor removido:",sC+DOT+DT+EQ+sPp+MI+sFq+MI+xi("h")+par(xi("T")+MI+sTa))+
+ stp("3. Equilíbrio (a temperatura deixa de variar, dT/dt = 0):",sTe+EQ+sTa+PL+xf(sPp+MI+sFq,xi("h")))+
+ stp("4. Com τ = C<sub>th</sub>/h obtém-se τ·dT/dt = T<sub>eq</sub> − T, cuja solução é:",xi("T")+par(xi("t"))+EQ+sTe+PL+par(sT0+MI+sTe)+DOT+sup(xi("e"),MI+xf(xi("t"),xi("τ"))))+
+ stp("5. Resolvendo em ordem ao tempo, o instante em que T atinge um limite T<sub>lim</sub> (T₁, T₂ ou T₃):",xi("t")+EQ+xi("τ")+DOT+xt("ln")+par(xf(sTe+MI+sT0,sTe+MI+Tl_))+"")+`</details>`}
+const Tl_=xs("T","lim");
+/* comparação */
+function cmpUpd(){$("cmp").innerHTML=MT.map((Mm,i)=>{const r=sim(i,S.T,S.Lt,900);let a=[];if(r.F[0])a.push(Mm.sh[0]);if(r.F[1])a.push(Mm.sh[1]);let s=a.length?a.join(" + "):"Natural";if(r.A)s+=" · ⚠ alarme";
+ return `<tr class="${i==S.m?"hl":""}"><td>${Mm.sn}</td><td>${fm(r.T)} °C</td><td>${s}</td></tr>`}).join("");
+ $("cmk").textContent="Comparação entre métodos (carga "+Math.round(S.Lt*100)+" %, T₀ = "+fm(S.T,0)+" °C, após 15 min)"}
+/* UI */
+SC.forEach((s,i)=>{const b=document.createElement("button");b.textContent=s[0];b.onclick=()=>scen(i);$("sc").appendChild(b)});
+MT.forEach((m,i)=>{const b=document.createElement("button");b.textContent=(i+1)+". "+m.sn;b.onclick=()=>setMethod(i);$("mg").appendChild(b)});
+document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{idle=false;view(+b.dataset.v)});
+$("bl").onclick=e=>{showL=!showL;e.currentTarget.classList.toggle("on",showL)};
+$("fs").onclick=()=>{try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(e){}};
+$("go").onclick=()=>{$("start").style.display="none";S.run=true;idle=false;view(0);cur=7;setMethod(0);setSp(1);ev("Simulação guiada iniciada: refrigeração natural")};
+const PK=1.0;
+function pkUi(){const b=$("pk");if(!b)return;b.classList.toggle("on",!!S.pk);b.textContent=S.pk?"■ Fim do pico":"⚡ Hora de pico"}
+$("ld").onclick=()=>{S.pk=0;pkUi();S.Lt=Math.min(1,Math.round((S.Lt+.1)*100)/100);$("sl").value=Math.round(S.Lt*100);$("ls").textContent=Math.round(S.Lt*100)+" %";ev("＋ Carga: demanda sobe para <b>"+Math.round(S.Lt*100)+" %</b>")};
+$("ld2").onclick=()=>{S.pk=0;S.Lt=Math.max(0,Math.round((S.Lt-.1)*100)/100);$("sl").value=Math.round(S.Lt*100);$("ls").textContent=Math.round(S.Lt*100)+" %";ev("－ Carga: demanda desce para <b>"+Math.round(S.Lt*100)+" %</b>")};
+$("au").onclick=e=>{S.auto=S.auto?0:1;e.currentTarget.classList.toggle("on",!!S.auto)};
+$("sb").onclick=e=>{const p=$("specp");p.classList.toggle("open");e.currentTarget.classList.toggle("on",p.classList.contains("open"))};
+$("gr").onclick=()=>{cur=7;S.sw=null;setMethod(0)};
+$("sl").oninput=e=>{S.pk=0;pkUi();S.Lt=e.target.value/100;$("ls").textContent=e.target.value+" %";document.querySelectorAll("#sc button").forEach(b=>b.classList.remove("on"))};
+$("ta").oninput=e=>{P.Ta=+e.target.value;$("tas").textContent=P.Ta+" °C";setMethodInfo()};
+function setMethodInfo(){const Mm=MT[S.m];$("pf").innerHTML=$("pf").innerHTML.replace(/T<sub>amb<\/sub> = \d+ °C/,"T<sub>amb</sub> = "+P.Ta+" °C")}
+function setSp(v){S.sp=v;document.querySelectorAll("#sp button").forEach(x=>x.classList.toggle("on",+x.dataset.s==v))}
+document.querySelectorAll("#sp button").forEach(b=>b.onclick=()=>setSp(+b.dataset.s));
+function pz(){S.pause=!S.pause;$("pa").textContent=S.pause?"▶ Continuar":"⏸ Pausar"}
+$("pa").onclick=pz;$("rs").onclick=()=>{demoStop();cur=7;S.pause=false;$("pa").textContent="⏸ Pausar";scen(7)};
+function demoStop(){demo=null;$("dm").classList.remove("on");$("dm").textContent="🎬 Demo automática"}
+$("dm").onclick=()=>{if(demo){demoStop();return}$("start").style.display="none";S.run=true;S.pause=false;$("pa").textContent="⏸ Pausar";idle=false;view(0);setSp(3);demo={i:0,d:150};scen(0);$("dm").classList.add("on");$("dm").textContent="■ Parar demo"};
+let AC=null,nb=0;$("snd").onclick=()=>{S.snd=!S.snd;$("snd").textContent="🔔 Som: "+(S.snd?"on":"off");try{AC=AC||new (window.AudioContext||window.webkitAudioContext)()}catch(e){}};
+function beep(){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.15)}
+addEventListener("keydown",e=>{if(e.target.tagName=="INPUT"||e.ctrlKey||e.metaKey||e.altKey)return;const k=e.key;
+ if(k==" "){e.preventDefault();pz()}
+ else if(k>="1"&&k<="7")scen(+k-1);
+ else if(k=="f"||k=="F")$("fs").onclick();
+ else if(k=="ArrowLeft"){gs.a-=.14;idle=false;orbitOff()}else if(k=="ArrowRight"){gs.a+=.14;idle=false;orbitOff()}
+ else if(k=="ArrowUp"){gs.e=clamp(gs.e+.09,.02,1.45)}else if(k=="ArrowDown"){gs.e=clamp(gs.e-.09,.02,1.45)}
+ else if(k=="+"||k=="="){gs.d=clamp(gs.d*.87,2.5,30)}else if(k=="-"||k=="_"){gs.d=clamp(gs.d*1.15,2.5,30)}
+ else if(k=="0"||k=="Home")view(curView);
+ else if(k=="Escape"&&openP)openPanel(openP)});
+const col=T=>T<P.T1?"var(--ok)":T<P.T2?"var(--wn)":T<P.T3?"var(--or)":"var(--cr)";
+function hud(){const Mm=MT[S.m],st=S.T<P.T1?0:S.T<P.T2?1:S.T<P.T3?2:3,Pl=pe(),Q=P.h*(S.T-P.Ta)+S.F[0]*Mm.q[0]+S.F[1]*Mm.q[1];
+ $("tv").textContent=fm(S.T)+" °C";const p=$("pill");const pi=S.T<P.T1?0:S.T<P.T2?1:S.T<=P.TN?2:S.T<P.T3?3:4;p.textContent=["NORMAL","1.º NÍVEL","2.º NÍVEL","ACIMA DO NORMAL","CRÍTICA"][pi];p.style.background=["var(--ok)","var(--ok)","var(--wn)","var(--or)","var(--cr)"][pi];
+ $("fill").style.clipPath="inset(0 "+(100-Math.max(0,Math.min(100,(S.T-20)/.9))).toFixed(1)+"% 0 0)";
+ [["f1",0],["f2",1]].forEach(a=>{const e=$(a[0]),ex=Mm.na>a[1];e.textContent=ex?(S.F[a[1]]?"Ligado":"Desligado"):"— (não existe)";e.className="v "+(ex&&S.F[a[1]]?"on1":"of")});
+ const a=$("al");a.textContent=S.A?"ACTIVO":"Desligado";a.className="v "+(S.A?"al":"of");$("tt").textContent=fmt(S.t);$("lv").textContent=Math.round(S.L*100)+" %";$("pq").textContent=fm(Pl,0)+" / "+fm(Q,0);
+ document.querySelectorAll("#mt tr").forEach(r=>r.classList.toggle("hl",+r.dataset.k==st));
+ const rows=[["Perdas P",Pl,"var(--cr)"],["h·(T−Tamb)",P.h*(S.T-P.Ta),"var(--ac)"]];
+ if(Mm.na>0)rows.push([Mm.act[0],S.F[0]*Mm.q[0],"var(--ok)"]);if(Mm.na>1)rows.push([Mm.act[1],S.F[1]*Mm.q[1],"var(--ok)"]);rows.push(["Q_ref total",Q,"var(--wn)"]);
+ $("bal").innerHTML=rows.map(r=>`<div class="bb"><span>${r[0]}</span><i><u style="width:${Math.max(0,Math.min(100,r[1]/90*100))}%;background:${r[2]}"></u></i><span>${fm(r[1],0)}</span></div>`).join("");
+ const d=(Pl-Q)/P.C;$("bv").textContent="P − Q = "+(Pl-Q>=0?"+":"−")+fm(Math.abs(Pl-Q))+" → "+(d>.005?"temperatura a subir":d<-.005?"temperatura a descer":"equilíbrio térmico")+" ("+(d>=0?"+":"−")+fm(Math.abs(d),2)+" °C/s)";
+ const th=S.T+P.g*Math.pow(S.L,P.y),Vv=Math.pow(2,(th-98)/6);$("hs").textContent=fm(th)+" °C";const ag=$("ag");ag.textContent="×"+fm(Vv,2);ag.className="v "+(Vv>1?"al":"on1");
+ coolUpd(Mm,Pl);advUpd(Mm);lamps();elec();mathUpd()}
+/* Etapa 2: suficiência por método (T de equilíbrio com todos os actuadores ligados) */
+const eqm=(i,L)=>{const M=MT[i],p=pl(L),T0=P.Ta+p/P.h;if(M.na==0||T0<P.T1)return T0;const a=P.Ta+(p-M.q[0])/P.h;if(a<P.T1-P.H)return P.T1-1;if(a<P.T2)return a;const b=P.Ta+(p-M.q[0]-M.q[1])/P.h;return b<P.T2-P.H?P.T2-1:b};
+const capL=i=>{if(eqm(i,1)<=P.TN)return 1;let lo=0,hi=1;for(let k=0;k<24;k++){const m=(lo+hi)/2;eqm(i,m)<=P.TN?lo=m:hi=m}return lo};
+const stt=T=>T<P.T1?0:T<=P.TN?1:T<P.T3?2:3,SN=["Normal","Normal (refrig.)","Acima do normal","Crítica"],SC2=["var(--ac)","var(--ok)","var(--wn)","var(--cr)"];
+function swap(i){const k={T:S.T,L:S.L,Lt:S.Lt,t:S.t,age:S.age,hist:S.hist,hn:S.hn},T0=S.T,e0=etaF(S.L,S.T);setMethod(i);Object.assign(S,k);ctl(S,S.T,MT[i]);$("sl").value=Math.round(S.Lt*100);$("ls").textContent=Math.round(S.Lt*100)+" %";S.sw={T:T0,e:e0};S._ak=null;ev("Mudança para <b>"+MT[i].sn+"</b> a "+fm(T0)+" °C")}
+function specUpd(){const k="s"+P.Ta;if(S._sk===k)return;S._sk=k;const r=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
+ $("spec").innerHTML=`<table><tbody>${r("Potência nominal Sₙ","1000 kVA")}${r("Tensões","33 / 0,4 kV")}${r("Tensão de curto-circuito","6 %")}${r("Perdas em vazio P₀",fm(P.P0*.22,2)+" kW")}${r("Perdas em carga (Sₙ)",fm(P.kL*.22,1)+" kW")}${r("Rendimento nominal η",fm(etaF(1,75),2)+" %")}${r("Temp. ambiente",P.Ta+" °C")}${r("<b>Temp. normal de trabalho</b>","<b>até "+P.TN+" °C</b>")}${r("Limite IEC 60076-2 (óleo topo)","55–65 K · alarme 90–105 °C")}${r("1.º / 2.º nível · alarme",P.T1+" · "+P.T2+" · "+P.T3+" °C")}${r("Ponto quente θh","T + "+P.g+"·L^"+fm(P.y,1)+" °C")}</tbody></table>
+ <div class="k" style="margin:8px 0 4px">Potência máxima por método com T ≤ ${P.TN} °C (temp. normal)</div><table><thead><tr><th>Método</th><th>Classe</th><th>S máx.</th></tr></thead><tbody>${MT.map((M,i)=>{const c=capL(i);return r("<b>"+M.sn+"</b>",M.k.split(" ")[0],(c>=1?"≥ ":"")+Math.round(c*100)+" % · "+Math.round(c*1000)+" kVA")}).join("")}</tbody></table>`}
+function advUpd(Mm){const Lf=(S.trip||S.op)?0:Math.max(S.L,S.Lt),a=$("adv"),hot=S.T>P.TN;$("dem").innerHTML="Demanda <b>"+Math.round(S.Lt*100)+" %</b> · "+Math.round(S.Lt*1000)+" kVA";specUpd();
+ const bs=S.T<=P.TN?["normal","var(--ok)"]:S.T<P.T3?["ACIMA do normal","var(--wn)"]:["CRÍTICA","var(--cr)"];$("bst").innerHTML=`Temp. normal de trabalho <b>até ${P.TN} °C</b> · <b style="color:${bs[1]}">${bs[0]}</b>`;
+ if(Lf<.02){a.style.display="none";return}a.style.display="block";
+ const te=MT.map((_,i)=>eqm(i,Lf));let rc=te.findIndex(t=>t<=P.TN-5);if(rc<0)rc=te.findIndex(t=>t<=P.TN);if(rc<0)rc=te.findIndex(t=>t<P.T3);const all=rc<0;if(all)rc=4;
+ const c=te[S.m],sc=stt(c),ok=c<=P.TN,rd=te.findIndex(t=>t<=P.TN-10);let h;
+ if(!hot&&rd>=0&&rd<S.m){if(S.auto&&cur!=6&&performance.now()-(S.aT||0)>3000){S.aT=performance.now();swap(rd);return}h=`<b style="color:var(--ok)">⬇ Carga menor: ${MT[rd].sn} já chega</b> (T eq. ≈ ${fm(te[rd],0)} °C)<br><button data-r="${rd}">Baixar para ${MT[rd].sn}</button>`}
+ else if(ok){const d=S.sw&&S.sw.T-S.T>.5?`<br>↓ <b>−${fm(S.sw.T-S.T)} °C</b> desde a mudança · η ${fm(etaF(S.L,S.T)-S.sw.e,2)} pp`:"";h=`<b style="color:var(--ok)">✔ ${Mm.sn}: dentro da capacidade</b> · T tende a ≈ ${fm(c,0)} °C (${c<P.T1?"abaixo da":"na"} faixa)${S.T>c+1?"<br>↘ a descer até a faixa de trabalho":""}${d}`}
+ else if(!hot)h=`<b style="color:var(--wn)">↗ ${Mm.sn}: a subir</b> para ≈ ${fm(c,0)} °C, acima da temperatura normal (≤ ${P.TN} °C)`;
+ else if(rc>S.m){if(S.auto&&cur!=6&&performance.now()-(S.aT||0)>1500){S.aT=performance.now();swap(rc);return}const g=etaF(Lf,te[rc])-etaF(Lf,c);h=`<b style="color:${SC2[sc]}">⚠ FORA DO NORMAL (&gt; ${P.TN} °C)</b>: ${Mm.sn} não chega (T eq. ≈ ${fm(c,0)} °C). Pedir <b>${MT[rc].sn}</b>: ≈ ${fm(te[rc],0)} °C, η ${g>=0?"+":""}${fm(g,2)} pp<br><button data-r="${rc}">Mudar para ${MT[rc].sn}</button>`}
+ else h=`<b style="color:var(--cr)">⛔ Capacidade máxima atingida</b> (T eq. ≈ ${fm(c,0)} °C). Reduzir a carga.`;
+ a.className=hot&&!ok?"hot":"";const key=h+Lf.toFixed(2)+S.m;if(S._ak!==key){S._ak=key;a.innerHTML=h;const b=a.querySelector("button");if(b)b.onclick=()=>swap(+b.dataset.r);
+  $("lad").innerHTML=MT.map((M,i)=>`<div class="lr${i==S.m?" cu":""}${i==rc&&!all?" rc":""}"><span><b>${M.sn}</b><br><small>${M.k}</small></span><span>≈ ${fm(te[i],0)} °C</span><span class="st" style="background:${SC2[stt(te[i])]}">${SN[stt(te[i])]}${i==rc?" ★":""}</span></div>`).join("")}}
+/* Rendimento dependente da temperatura: R_cu ∝ (235+T)/(235+75) */
+const etaF=(L,T)=>{const Pu=L*900,Pt=P.P0*.22+P.kL*L*L*.22*(235+T)/310;return 100*Pu/(Pu+Pt)};
+function coolUpd(Mm,Pl){const e=$("eta");if(Pl<=0||S.L<.02){e.textContent="–";$("etg").textContent="";$("cdt").textContent="–";$("cqp").textContent="–";return}
+ const Qa=S.F[0]*Mm.q[0]+S.F[1]*Mm.q[1],Tn=P.Ta+Pl/P.h,Te=Math.max(P.Ta,P.Ta+(Pl-Qa)/P.h),g=etaF(S.L,Te)-etaF(S.L,Tn);
+ e.textContent=fm(etaF(S.L,S.T),2)+" %";$("etg").textContent=Qa>0?"+"+fm(g,2)+" pp vs natural":"sem refrig. forçada";
+ $("cdt").textContent=Qa>0?"−"+fm(Tn-Te,0)+" °C":"0 °C";$("cdt").style.color=Qa>0?"var(--ok)":"#fff";
+ $("cqp").textContent=fm(Math.min(100,100*Qa/Pl),0)+" %"}
+const pe=()=>(S.trip||S.op)?0:pl(S.L)+(S.fault==1?5:0);
+function bh(d){if(S.trip){S.L=0;S.Lt=0;return}
+ if(S.fault==1&&!S.op){S.gas=Math.min(1,S.gas+d*.06);if(S.gas>=.5&&!S.b1){S.b1=1;ev("Buchholz — <b>1.º estágio</b>: gás acumulado, alarme")}}
+ if(S.fault==2&&!S.op&&(S.sg-=d)<=0){S.trip=1;S.L=0;S.Lt=0;S.gas=1;S.b1=1;S.sg=0;ev("Buchholz — <b>2.º estágio</b>: surto de óleo, <b>disparo do disjuntor</b>")}}
+function cap(t){$("sn").textContent=t;$("sn").style.display="block"}
+function cbClose(){if(S.trip){ev("Disjuntor bloqueado: rearmar o relé de Buchholz primeiro");return}if(!S.op)return;S.op=0;S.inr=1;S.inrA=6+Math.random()*4;ev("Disjuntor <b>fechado</b>: transformador energizado — inrush de "+fm(S.inrA,1)+" × I<sub>n</sub> (pico)")}
+function cbOpen(){if(S.op||S.trip)return;S.op=1;if(S.fault==2){S.fault=0;S.sg=0}ev("Disjuntor <b>aberto</b>: transformador desenergizado")}
+function energ(){S.T=P.Ta;S.L=0;S.Lt=0;S.op=1;S.sg=0;S.sc=[[4,"c",0,"② O disjuntor FECHA: surge a corrente de magnetização (inrush) e o transformador é energizado."],[18,"n",0,"③ Em vazio: só as perdas no ferro (P₀) aquecem o óleo, devagar."],[26,"l",.35,"④ Carga de 35 %: as perdas no cobre (∝ L²) somam-se às do ferro."],[55,"l",.7,"⑤ Carga de 70 %: o óleo circula mais depressa e o calor sobe aos radiadores."],[85,"l",.95,"⑥ Carga de 95 %: o ventilador 1 entra quando T ≥ 60 °C e o 2 quando T ≥ 75 °C."],[115,"l",1,"⑦ Carga de 100 %: refrigeração máxima; se T ≥ 95 °C, o alarme actua."]];cap("① Disjuntor ABERTO: transformador desenergizado, óleo à temperatura ambiente.");ev("Cenário de energização iniciado (disjuntor aberto)")}
+function script(){if(!S.sc)return;while(S.sc.length&&S.t>=S.sc[0][0]){const e=S.sc.shift();if(e[1]=="c")cbClose();else if(e[1]=="l"){S.Lt=e[2];$("sl").value=Math.round(e[2]*100);$("ls").textContent=Math.round(e[2]*100)+" %";ev("Carga ligada: L = "+Math.round(e[2]*100)+" %")}cap(e[3])}}
+function elec(){const off=S.trip||S.op,Lx=off?0:S.L,Sn=1000,cf=.9,sf=Math.sqrt(1-cf*cf),u=.22,Sk=Lx*Sn,Pu=Sk*cf,Qv=Sk*sf,Pfe=off?0:P.P0*u,Pcu=P.kL*Lx*Lx*u*(235+S.T)/310,Pt=Pfe+Pcu,eta=Pu>0?100*Pu/(Pu+Pt):0,er=P.kL*u/Sn*100,ex=Math.sqrt(36-er*er),dv=Lx*(er*cf+ex*sf),V2=off?0:400*(1-dv/100-.03*S.inr),I1n=Sn/(Math.sqrt(3)*33),I1=off?0:Math.max(Sk/(Math.sqrt(3)*33),.005*I1n),I2=V2>0?Sk/(Math.sqrt(3)*V2/1000):0,Iin=off?0:S.inr*S.inrA*I1n*Math.SQRT2;
+ const it=[["Potência aparente S",fm(Sk,0)+" kVA"],["Potência activa P₂",fm(Pu,0)+" kW"],["Potência reactiva Q",fm(Qv,0)+" kvar"],["Perdas totais",fm(Pt,1)+" kW<div class=fn>Fe "+fm(Pfe,1)+" · Cu "+fm(Pcu,1)+"</div>"],["Tensão V₁ / V₂",off?"0 / 0 V":"33 kV / "+fm(V2,0)+" V"],["Corrente I₁ / I₂",fm(I1,1)+" / "+fm(I2,0)+" A"],["Inrush I₁ (pico)",Iin>1?fm(Iin,0)+" A<div class=fn>"+fm(S.inr*S.inrA,1)+" × I<sub>n</sub></div>":"–"],["Rendimento η",fm(eta,1)+" %"]];
+ $("el").innerHTML=it.map(a=>`<div class="r"><div class="k">${a[0]}</div><div class="v" style="font-size:14px">${a[1]}</div></div>`).join("");
+ const g=$("osc").getContext("2d"),W=420,H=84;g.clearRect(0,0,W,H);g.fillStyle="#7d8ba0";g.font="10px sans-serif";g.fillText("i₁(t) · 6 ciclos de 50 Hz",6,11);g.strokeStyle="#1f2a38";g.beginPath();g.moveTo(0,H/2);g.lineTo(W,H/2);g.stroke();
+ if(off){g.fillStyle="#8fa0b5";g.font="12px sans-serif";g.fillText("Desenergizado — i₁ = 0",W/2-70,H/2-8)}else{const A=S.inr*S.inrA,scl=Math.max(1.3,A+Lx);g.strokeStyle=S.inr>.05?"#ff6b5a":"#4fd1c5";g.lineWidth=1.6;g.beginPath();for(let x=0;x<=W;x+=2){const th=x/W*12*Math.PI,i=Lx*Math.sin(th-.45)+.005*Math.sin(th)+A*(1-.25*x/W)*Math.pow(Math.max(0,Math.sin(th)),2),y=H/2-(i/scl)*(H/2-8);x?g.lineTo(x,y):g.moveTo(x,y)}g.stroke()}
+ $("cbs").innerHTML=S.trip?"<span class=al>ABERTO · disparo</span>":S.op?"<span class=al>ABERTO</span>":"<span class=on1>FECHADO</span>";$("cbv").textContent=off?"0 V · desenergizado":"33 kV · energizado";
+ $("cbd").textContent=off?"A rede (lado de entrada) mantém 33 kV. Com o disjuntor aberto o transformador está desenergizado: sem fluxo no núcleo, sem perdas e sem aquecimento. Ao fechar, surge a corrente de magnetização (inrush).":"Fechado: o primário recebe 33 kV, o núcleo é magnetizado (perdas no ferro P₀) e a carga define as perdas no cobre. O disjuntor abre por comando manual ou por disparo do relé de Buchholz.";
+ const st=S.trip?2:S.b1?1:0;$("bhs").textContent=["Normal","ALARME 1.º est.","DISPARO 2.º est."][st];$("bhs").className="v "+["on1","al","al"][st];$("bhg").textContent=fm(S.gas*100,0)+" %";const bn=$("bn");bn.style.display=st?"block":"none";bn.style.background=st==2?"rgba(220,50,50,.92)":"rgba(240,170,40,.95)";bn.style.color=st==2?"#fff":"#1a1200";bn.textContent=st==2?"⛔ BUCHHOLZ — 2.º ESTÁGIO: surto de óleo → DISJUNTOR ABERTO":"⚠ BUCHHOLZ — 1.º ESTÁGIO: gás acumulado → ALARME";
+ $("bhd").textContent=["Relé cheio de óleo e flutuador em cima. Numa falha interna (arco, sobreaquecimento local) o óleo e o isolamento decompõem-se e libertam gás, que sobe pela tubagem para o relé.","1.º estágio: o gás acumula-se na câmara, desloca o óleo e o flutuador desce, fechando o contacto de alarme. Falha lenta: recolher o gás pela válvula e analisá-lo.","2.º estágio: a produção violenta de gás cria um surto de óleo para o conservador; a palheta actua e dá ordem de disparo ao disjuntor. O transformador fica desenergizado."][st]}
+/* ciclo */
+const cool=new THREE.Color(0x3a5a7a),warm=new THREE.Color(0xe08a30),hot=new THREE.Color(0xd83a36),tmp=new THREE.Color();
+const U=[0,0];let last=performance.now(),acc=0,bk=0,ac2=0;
+function loop(now){requestAnimationFrame(loop);const dt=Math.min((now-last)/1000,.05);last=now;const ad=S.pause?0:dt,m=S.m,Mm=MT[m];
+ if(S.run&&!S.pause){let sd=dt*S.sp;while(sd>0){const d=Math.min(sd,.1);step(d);sd-=d}
+  if(demo&&S.t>=demo.d){demo.i++;if(demo.i>=6){demoStop();ev("Demo concluída")}else scen(demo.i)}}
+ if(!S.run){S.T=51.4+.4*Math.sin(now/2500)}
+ const k=Math.max(0,Math.min(1,(S.T-40)/50));tmp.copy(cool).lerp(warm,Math.min(1,k*2)).lerp(hot,Math.max(0,k*2-1));tank.material.color.copy(tmp);tank.material.emissive.copy(tmp).multiplyScalar(.12+.25*k);tx+=((S.int?1:0)-tx)*(1-Math.exp(-dt*7));const od=tx<.05;tank.material.opacity=1-.88*tx;cover.material.opacity=tank.material.opacity;tank.material.depthWrite=od;radM.opacity=1-.6*tx;radM.depthWrite=od;pipeM.opacity=1-.6*tx;pipeM.depthWrite=od;glass.opacity=1-.72*tx;glass.depthWrite=od;glass.color.setHex(0x6d7885).lerp(gcl,tx);radM.color.copy(tmp);radM.emissive.copy(tmp).multiplyScalar(.5);cOil.scale.y=Math.max(.5,Math.min(1.35,.6+(S.T-30)/65*.7));cOil.position.y=3.47+.15*cOil.scale.y;mHV.emissive.copy(hot).multiplyScalar(Math.max(0,(S.T+P.g*Math.pow(S.L,P.y)-50)/160));
+ for(let i=0;i<2;i++){const g0=(S.F[i]&&S.run&&i<Mm.na)?1:0;U[i]+=(g0-U[i])*(1-Math.exp(-ad*(g0>U[i]?2.2:.7)))}
+ fans.forEach((f,i)=>{if(!f.u.visible)return;const uf=m==1?U[i]:U[1],w=uf*16;f.rot.rotation.z-=w*ad;f.pm.opacity=Math.min(.7,uf*.7);
+  const a=f.pt.geometry.attributes.position;for(let j=0;j<a.count;j++){let xx=a.getX(j)+f.v[j]*ad*uf*1.6;if(xx>7.5||w<.5&&xx>3.4+Math.random()){xx=3.3;a.setY(j,f.y+(Math.random()-.5)*.8);a.setZ(j,f.z+(Math.random()-.5)*.8)}a.setX(j,xx)}a.needsUpdate=true});
+ if(pA.g.visible)pA.rot.rotation.z-=U[0]*10*ad;if(pB.g.visible)pB.rot.rotation.z-=U[1]*10*ad;if(wP.g.visible)wP.rot.rotation.z-=U[1]*10*ad;
+ const osp=m>=2?.3+1.7*(m==4?(U[0]+U[1])/2:U[0]):.2+.8*k;ov+=(osp*(S.sg>0?4:1)-ov)*(1-Math.exp(-ad*1.5));runFlow(oilF,Math.min(ov,2.2),ad);oil(ov,now,ad);bhv(ad,now);cbAnim(ad,now);runFlow(oilC,S.sg>0?6:.1+.25*(S.fault==1),ad);
+ if(m==3){runFlow(watF,.2+1.8*U[1],ad)}
+ bk+=dt;const on=(S.A||S.b1||S.trip)&&S.run,fl=on&&(Math.floor(bk*3)%2==0);lm.emissiveIntensity=on?(fl?3:.4):.05;pLt.intensity=fl?2.2:0;lm.color.set(on?0xff4444:0x661111);
+ if(on&&S.snd&&bk-nb>.8&&!S.pause){beep();nb=bk}
+ if((idle&&!S.run)||orbit)gs.a+=dt*(orbit?.2:.12);
+ if(!ptr.size){gs.a+=vel.a*dt;gs.e=clamp(gs.e+vel.e*dt,.02,1.45);const dm=Math.exp(-dt*3.2);vel.a*=dm;vel.e*=dm}
+ const kc=1-Math.exp(-dt*(ptr.size?26:7));["a","e","d"].forEach(q=>cs[q]+=(gs[q]-cs[q])*kc);cs.t.lerp(gs.t,kc);
+ const kv=1-Math.exp(-dt*6);vox+=(vtx-vox)*kv;voy+=(vty-voy)*kv;
+ if(Math.abs(vox)<.3&&Math.abs(voy)<.3){if(cm.view&&cm.view.enabled)cm.clearViewOffset()}else cm.setViewOffset(vw,vh,vox,voy,vw,vh);
+ cm.position.set(cs.t.x+cs.d*Math.cos(cs.e)*Math.sin(cs.a),cs.t.y+cs.d*Math.sin(cs.e),cs.t.z+cs.d*Math.cos(cs.e)*Math.cos(cs.a));cm.lookAt(cs.t);
+ acc+=dt;if(acc>.1){acc=0;hud();drawScr();draw()}
+ ac2+=dt;if(ac2>.5){ac2=0;cmpUpd();calcVO()}
+ cm.updateMatrixWorld();LD.forEach(l=>{v3.copy(l.p).project(cm);const x=(v3.x*.5+.5)*vw,y=(-v3.y*.5+.5)*vh,show=showL&&l.v(m)&&v3.z<1&&l.p.distanceTo(cs.t)<2.4+cs.d*.42;l.e.style.opacity=show?1:0;l.e.style.transform="translate("+x.toFixed(1)+"px,"+y.toFixed(1)+"px) translate(-50%,-100%)"});
+ R.render(sc,cm)}
+$("c1").onclick=cbClose;$("c2").onclick=cbOpen;$("c3").onclick=()=>scen(6);
+
+$("iv").onclick=e=>{S.int=!S.int;e.currentTarget.classList.toggle("on",S.int)};
+$("b1").onclick=()=>{if(S.trip||S.op){ev("Disjuntor aberto: sem tensão, não há falha a simular");return}S.fault=1;S.gas=0;S.b1=0;ev("Falha incipiente: sobreaquecimento local e decomposição do óleo");idle=false;view(3)};
+$("b2").onclick=()=>{if(S.trip||S.op){ev("Disjuntor aberto: sem tensão, não há falha a simular");return}S.fault=2;S.sg=2.5;ev("Falha grave: arco interno, surto de óleo");idle=false;view(3)};
+$("b3").onclick=()=>{S.trip=0;S.fault=0;S.gas=0;S.b1=0;S.sg=0;S.op=1;S.Lt=$("sl").value/100;S.L=0;ev("Relé rearmado e gás purgado. Disjuntor aberto: fechar para reenergizar")};
+/* painéis (gavetas) */
+const PT={view:"Vistas e ecrã",method:"Método de refrigeração",state:"Estado do sistema",ctrl:"Controlo e cenários",elec:"Disjuntor e grandezas eléctricas",bh:"Relé de Buchholz",math:"Fórmulas e parâmetros"},PV={method:1,elec:4,bh:3};
+let openP=null,autoCam=true;
+const isOpen=n=>openP==n;
+function openPanel(n){openP=openP==n?null:n;
+ document.querySelectorAll(".pnl").forEach(p=>p.classList.toggle("show",p.id=="p-"+openP));
+ document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.p==openP));
+ $("sheet").classList.toggle("open",!!openP);$("sheet").setAttribute("aria-hidden",openP?"false":"true");$("app").classList.toggle("po",!!openP);
+ if(openP){$("sh-t").textContent=PT[openP];$("sbody").scrollTop=0;if(autoCam&&PV[openP]!=null){idle=false;view(PV[openP])}}
+ if(openP=="math")mathUpd();calcVO()}
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>openPanel(b.dataset.p));
+$("sx").onclick=()=>openPanel(openP);
+$("sheet").addEventListener("transitionend",e=>{if(e.target.id=="sheet")calcVO()});
+$("orb").onclick=e=>{orbit=!orbit;idle=false;e.currentTarget.classList.toggle("on",orbit)};
+$("af").onclick=e=>{autoCam=!autoCam;e.currentTarget.classList.toggle("on",autoCam)};
+function lamps(){const Mm=MT[S.m];[["lA1",0],["lA2",1]].forEach(a=>{const e=$(a[0]),ex=Mm.na>a[1];e.textContent=ex?Mm.sh[a[1]]:"—";e.className=ex&&S.F[a[1]]?"on":""});$("lAL").className=S.A?"al":"";$("lAL").textContent=S.A?"⚠ Alarme":"Alarme"}
+view(0);
+guide();resize();setMethod(1);requestAnimationFrame(loop);
+</script></body></html>
